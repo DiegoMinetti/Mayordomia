@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+package-lock.json
+apps-script
+docs
+public
+*.html
+*.svg
+*.md
+.github

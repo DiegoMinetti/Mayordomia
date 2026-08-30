@@ -1,0 +1,43 @@
+node_modules
+dist
+coverage
+
+# env files (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# clasp (Apps Script) — scriptId varies per developer
+.clasp.json
+.clasp.json.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Build / artifacts
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Test artifacts
+playwright-report
+test-results
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env overrides
+.npmrc.local
+.yarnrc.local
