@@ -37,3 +37,12 @@ Router.register('catalog.listOrganizations', { auth: true }, function (payload, 
 Router.register('catalog.listSites', { auth: true }, function (payload, ctx) { return Catalog.listSites(payload, ctx); });
 Router.register('catalog.listUsers', { auth: true }, function (payload, ctx) { return Catalog.listUsers(payload, ctx); });
 Router.register('catalog.listRoles', { auth: true }, function (payload, ctx) { return Catalog.listRoles(payload, ctx); });
+// PR 1B — Recursos / Espacios (read endpoints). All require auth and scope
+// to the caller's organization; write paths land in a follow-up PR.
+Router.register('resources.list', { auth: true }, function (payload, ctx) { return Resources.list(payload, ctx); });
+Router.register('resources.get', { auth: true }, function (payload, ctx) { return Resources.get(payload, ctx); });
+Router.register('resources.listLocations', { auth: true }, function (payload, ctx) { return Resources.listLocations(payload, ctx); });
+Router.register('resources.getLocation', { auth: true }, function (payload, ctx) { return Resources.getLocation(payload, ctx); });
+Router.register('resources.listReservations', { auth: true }, function (payload, ctx) { return Resources.listReservations(payload, ctx); });
+Router.register('resources.listMovements', { auth: true }, function (payload, ctx) { return Resources.listMovements(payload, ctx); });
+Router.register('resources.checkAvailability', { auth: true }, function (payload, ctx) { return Resources.checkAvailability(payload, ctx); });

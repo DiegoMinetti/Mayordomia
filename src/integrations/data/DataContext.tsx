@@ -3,6 +3,9 @@ import { DataClient } from './DataClient';
 import { GatewayClient, type GatewayClientDeps } from './GatewayClient';
 
 const DataContext = createContext<DataClient | null>(null);
+// Exported for tests so they can wrap a fake client without spinning up
+// the real provider + deps. The provider remains the public API.
+export { DataContext };
 
 export interface DataProviderProps {
   /** Per-organization data client. The provider creates it lazily from deps + org. */

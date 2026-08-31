@@ -4,13 +4,15 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PublicRequestPage } from '../features/public/PublicRequestPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { PlaceholderPage } from '../components/PlaceholderPage';
+import { ResourcesPage } from '../features/resources/ResourcesPage';
+import { ResourceDetailPage } from '../features/resources/ResourceDetailPage';
+import { LocationsPage } from '../features/locations/LocationsPage';
+import { LocationDetailPage } from '../features/locations/LocationDetailPage';
 
 const pages: Record<string, [string, string]> = {
   agenda: ['Agenda', 'Eventos, reservas, entregas, devoluciones y tareas en una vista unificada.'],
   requests: ['Solicitudes', 'Revisión, aprobaciones por área y seguimiento operativo.'],
   events: ['Eventos', 'El centro operativo de personas, espacios, recursos y tareas.'],
-  resources: ['Recursos', 'Inventario serializado y por cantidad con historial de movimientos.'],
-  locations: ['Espacios', 'Disponibilidad, capacidad y reglas de reserva.'],
   maintenance: ['Mantenimiento', 'Fallas, reparaciones e inspecciones preventivas.'],
   purchases: ['Compras', 'Necesidades, cotizaciones, scoring explicable y decisiones trazables.'],
   settings: ['Configuración', 'Organización, sedes, áreas, usuarios e integraciones.'],
@@ -29,6 +31,10 @@ export function App() {
             element={<PlaceholderPage title={title} description={desc} />}
           />
         ))}
+        <Route path="/resources" element={<ResourcesPage />} />
+        <Route path="/resources/:id" element={<ResourceDetailPage />} />
+        <Route path="/locations" element={<LocationsPage />} />
+        <Route path="/locations/:id" element={<LocationDetailPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
