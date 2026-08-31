@@ -68,7 +68,16 @@ function renderPage() {
   return render(
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={qc}>
-        <DataContext.Provider value={{ catalog: makeFakeClient(), requests: {} as never }}>
+        <DataContext.Provider
+          value={{
+            catalog: makeFakeClient(),
+            requests: {} as never,
+            operations: {} as never,
+            maintenance: {} as never,
+            purchases: {} as never,
+            notifications: {} as never,
+          }}
+        >
           <MemoryRouter>
             <ResourcesPage />
           </MemoryRouter>
@@ -103,6 +112,10 @@ describe('ResourcesPage', () => {
         listResources: vi.fn().mockResolvedValue([]),
       } as unknown as DataClient,
       requests: {} as never,
+      operations: {} as never,
+      maintenance: {} as never,
+      purchases: {} as never,
+      notifications: {} as never,
     };
     render(
       <ThemeProvider theme={theme}>

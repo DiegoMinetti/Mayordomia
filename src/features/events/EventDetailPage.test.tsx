@@ -74,7 +74,16 @@ function buildFakeClient(
 
 function TestProvider({ client, children }: { client: DataClient; children: ReactNode }) {
   return (
-    <DataContext.Provider value={{ catalog: client, requests: {} as never }}>
+    <DataContext.Provider
+      value={{
+        catalog: client,
+        requests: {} as never,
+        operations: {} as never,
+        maintenance: {} as never,
+        purchases: {} as never,
+        notifications: {} as never,
+      }}
+    >
       {children}
     </DataContext.Provider>
   );

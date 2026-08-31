@@ -10,7 +10,6 @@ import {
   Logout as LogoutIcon,
   Menu,
   MoreHoriz,
-  Notifications,
   Place,
   RequestPage,
   ShoppingCart,
@@ -18,7 +17,6 @@ import {
 import {
   AppBar,
   Avatar,
-  Badge,
   Box,
   BottomNavigation,
   BottomNavigationAction,
@@ -42,6 +40,7 @@ import {
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../integrations/auth';
 import { useCurrentOrg } from '../integrations/org';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 
 const nav = [
   { to: '/', label: 'Inicio', icon: Dashboard },
@@ -172,11 +171,7 @@ export function AppShell() {
               </span>
             </Tooltip>
           )}
-          <IconButton aria-label="3 notificaciones">
-            <Badge badgeContent={3} color="error">
-              <Notifications />
-            </Badge>
-          </IconButton>
+          <NotificationBell />
         </Toolbar>
       </AppBar>
       <Box component="nav">

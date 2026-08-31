@@ -1,16 +1,40 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentOrg } from '../org';
-import { useDataClient, useRequestsClient } from './DataContext';
+import {
+  useDataClient,
+  useMaintenanceClient,
+  useNotificationsClient,
+  useOperationsClient,
+  usePurchasesClient,
+  useRequestsClient,
+} from './DataContext';
+import type { DeliveryWithItems } from './OperationsDataClient';
+import type { MaintenanceWithUpdates as MaintenanceDetail } from './MaintenanceDataClient';
 import type {
+  AddQuoteInput,
   AvailabilityItem,
   AvailabilityResult,
+  CreateMaintenancePayload,
+  CreatePurchaseRequestInput,
+  DecidePurchaseInput,
+  DeliveryDto,
+  DeliveryListFilters,
+  DeliverPayload,
   EventDetailDto,
   EventDto,
   EventFilters,
   LocationDto,
   LocationFilters,
+  MaintenanceDto,
+  MaintenanceListFilters,
   MovementDto,
+  NotificationDto,
+  NotificationListFilters,
   OrgDto,
+  PurchaseRequestDetailDto,
+  PurchaseRequestDto,
+  PurchaseRequestFilters,
+  QuoteDto,
   RequestDecisionPayload,
   RequestDto,
   RequestListFilters,
@@ -18,8 +42,12 @@ import type {
   ReservationFilters,
   ResourceDto,
   ResourceFilters,
+  ReturnDeliveryItemPayload,
   RoleDto,
   SiteDto,
+  SupplierDto,
+  UpdateMaintenancePayload,
+  UpsertSupplierInput,
   UserDto,
 } from './types';
 
@@ -253,5 +281,240 @@ export function useUpcomingEvents(daysAhead = 14, enabled = true) {
     enabled,
     queryFn: () => client.upcomingEvents(daysAhead),
     staleTime: 30_000,
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3a — Operations (Deliveries / Devoluciones)                            */
+/* -------------------------------------------------------------------------- */
+
+export function useDeliveries(filters: DeliveryListFilters = {}, enabled = true) {
+  const client = useOperationsClient();
+  return useQuery<DeliveryDto[]>({
+    queryKey: ['operations', 'deliveries', 'current', filters],
+    enabled,
+    queryFn: () => client.listDeliveries(filters),
+    staleTime: 30_000,
+  });
+}
+
+export function useDelivery(id: string | undefined, enabled = true) {
+  const client = useOperationsClient();
+  return useQuery<DeliveryWithItems | null>({
+    queryKey: ['operations', 'delivery', 'current', id ?? '_'],
+    enabled: enabled && Boolean(id),
+    queryFn: async () => (id ? ((await client.getDelivery(id)) ?? null) : null),
+    staleTime: 30_000,
+  });
+}
+
+export function useDeliver() {
+  const client = useOperationsClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DeliverPayload) => client.deliver(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operations'] }),
+  });
+}
+
+export function useReturnDeliveryItem() {
+  const client = useOperationsClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: ReturnDeliveryItemPayload) => client.returnDeliveryItem(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['operations'] }),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3a — Maintenance                                                      */
+/* -------------------------------------------------------------------------- */
+
+export function useMaintenanceList(filters: MaintenanceListFilters = {}, enabled = true) {
+  const client = useMaintenanceClient();
+  return useQuery<MaintenanceDto[]>({
+    queryKey: ['maintenance', 'list', 'current', filters],
+    enabled,
+    queryFn: () => client.listMaintenance(filters),
+    staleTime: 30_000,
+  });
+}
+
+export function useMaintenance(id: string | undefined, enabled = true) {
+  const client = useMaintenanceClient();
+  return useQuery<MaintenanceDetail | null>({
+    queryKey: ['maintenance', 'detail', 'current', id ?? '_'],
+    enabled: enabled && Boolean(id),
+    queryFn: async () => (id ? ((await client.getMaintenance(id)) ?? null) : null),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateMaintenance() {
+  const client = useMaintenanceClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateMaintenancePayload) => client.createMaintenance(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['maintenance'] }),
+  });
+}
+
+export function useUpdateMaintenance() {
+  const client = useMaintenanceClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateMaintenancePayload) => client.updateMaintenance(payload),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['maintenance'] });
+      if (vars?.id)
+        qc.invalidateQueries({ queryKey: ['maintenance', 'detail', 'current', vars.id] });
+    },
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3b — Purchases / Compras                                              */
+/* -------------------------------------------------------------------------- */
+
+export function usePurchaseRequests(filters: PurchaseRequestFilters = {}, enabled = true) {
+  const client = usePurchasesClient();
+  return useQuery<PurchaseRequestDto[]>({
+    queryKey: ['purchases', 'list', 'current', filters],
+    enabled,
+    queryFn: () => client.listRequests(filters),
+    staleTime: 30_000,
+  });
+}
+
+export function usePurchaseRequest(id: string | undefined, enabled = true) {
+  const client = usePurchasesClient();
+  return useQuery<PurchaseRequestDetailDto | null>({
+    queryKey: ['purchases', 'detail', 'current', id ?? '_'],
+    enabled: enabled && Boolean(id),
+    queryFn: async () => (id ? ((await client.getRequest(id)) ?? null) : null),
+    staleTime: 30_000,
+  });
+}
+
+export function useCreatePurchaseRequest() {
+  const client = usePurchasesClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreatePurchaseRequestInput) => client.createRequest(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchases'] }),
+  });
+}
+
+export function useQuotes(purchaseRequestId: string | undefined, enabled = true) {
+  const client = usePurchasesClient();
+  return useQuery<QuoteDto[]>({
+    queryKey: ['purchases', 'quotes', 'current', purchaseRequestId ?? '_'],
+    enabled: enabled && Boolean(purchaseRequestId),
+    queryFn: () => client.listQuotes(purchaseRequestId as string),
+    staleTime: 30_000,
+  });
+}
+
+export function useAddQuote() {
+  const client = usePurchasesClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: AddQuoteInput) => client.addQuote(payload),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['purchases', 'quotes'] });
+      if (vars?.purchaseRequestId) {
+        qc.invalidateQueries({
+          queryKey: ['purchases', 'detail', 'current', vars.purchaseRequestId],
+        });
+      }
+    },
+  });
+}
+
+export function useDecidePurchase() {
+  const client = usePurchasesClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: DecidePurchaseInput) => client.decide(payload),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['purchases'] });
+      if (vars?.purchaseRequestId) {
+        qc.invalidateQueries({
+          queryKey: ['purchases', 'detail', 'current', vars.purchaseRequestId],
+        });
+      }
+    },
+  });
+}
+
+export function useSuppliers(enabled = true) {
+  const client = usePurchasesClient();
+  return useQuery<SupplierDto[]>({
+    queryKey: ['purchases', 'suppliers', 'current'],
+    enabled,
+    queryFn: () => client.listSuppliers(),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpsertSupplier() {
+  const client = usePurchasesClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpsertSupplierInput) => client.upsertSupplier(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchases', 'suppliers'] }),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3c — Notifications (in-app)                                            */
+/* -------------------------------------------------------------------------- */
+
+export const NOTIFICATIONS_QUERY_KEY = ['notifications', 'list', 'current'] as const;
+export const UNREAD_COUNT_QUERY_KEY = ['notifications', 'unreadCount', 'current'] as const;
+
+export function useMyNotifications(filters: NotificationListFilters = {}, enabled = true) {
+  const client = useNotificationsClient();
+  return useQuery<NotificationDto[]>({
+    queryKey: [...NOTIFICATIONS_QUERY_KEY, filters],
+    enabled,
+    queryFn: () => client.listMyNotifications(filters),
+    staleTime: 30_000,
+  });
+}
+
+export function useUnreadCount(options: { pollingInterval?: number; enabled?: boolean } = {}) {
+  const client = useNotificationsClient();
+  const { enabled = true, pollingInterval = 30_000 } = options;
+  return useQuery<number>({
+    queryKey: [...UNREAD_COUNT_QUERY_KEY],
+    enabled,
+    refetchInterval: enabled ? pollingInterval : false,
+    queryFn: async () => client.unreadCount(),
+    staleTime: 10_000,
+  });
+}
+
+export function useMarkRead() {
+  const client = useNotificationsClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => client.markRead(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: UNREAD_COUNT_QUERY_KEY });
+    },
+  });
+}
+
+export function useMarkAllRead() {
+  const client = useNotificationsClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => client.markAllRead(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: NOTIFICATIONS_QUERY_KEY });
+      qc.invalidateQueries({ queryKey: UNREAD_COUNT_QUERY_KEY });
+    },
   });
 }

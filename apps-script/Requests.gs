@@ -104,6 +104,7 @@ var Requests = (function () {
       requestId: ctx.requestId,
       metadata: { scope: input.scope, areaId: approval.areaId || null, comment: input.comment || '' }
     });
+    publishApprovalNotification_(request, 'REQUEST_APPROVED', ctx);
     return { id: input.id, status: nextStatus, version: Number(request.version || 1) + 1 };
   }
 
@@ -144,7 +145,30 @@ var Requests = (function () {
       requestId: ctx.requestId,
       metadata: { scope: input.scope, areaId: approval.areaId || null, comment: input.comment || '' }
     });
+    publishApprovalNotification_(request, 'REQUEST_REJECTED', ctx);
     return { id: input.id, status: nextStatus, version: Number(request.version || 1) + 1 };
+  }
+
+  // Best-effort fan-out to the in-app notification center. Wrapped in
+  // try/catch so a notification failure never breaks the approval flow.
+  function publishApprovalNotification_(request, kind, ctx) {
+    try {
+      var title = kind === 'REQUEST_APPROVED' ? 'Solicitud aprobada' : 'Solicitud rechazada';
+      var link = '/requests/' + String(request.id);
+      var body = String(request.description || request.title || '').slice(0, 200);
+      Notifications.publish({
+        organizationId: ctx.auth.organizationId,
+        userId: null,
+        kind: kind,
+        title: title,
+        body: body,
+        link: link,
+        entityType: 'Request',
+        entityId: String(request.id),
+      }, { auth: { user: { id: 'system' }, organizationId: ctx.auth.organizationId }, requestId: ctx.requestId });
+    } catch (e) {
+      console.error('publishApprovalNotification_ failed: ' + e);
+    }
   }
 
   // ---------------- helpers ----------------

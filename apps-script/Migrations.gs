@@ -1,5 +1,5 @@
 var Schema = (function () {
-  var VERSION = 2;
+  var VERSION = 4;
   var TABLES = {
     SchemaMeta: ['key','value','updatedAt'],
     Organizations: ['id','name','timezone','active','status','createdAt','updatedAt','createdBy','updatedBy','version'],
@@ -23,7 +23,21 @@ var Schema = (function () {
     EventAreas: ['id','organizationId','eventId','areaId','responsibility'],
     EventResources: ['id','organizationId','eventId','resourceId','quantity'],
     EventPeople: ['id','organizationId','eventId','personId','role'],
-    EventTemplates: ['id','organizationId','name','description','durationMinutes','defaultAreas','defaultResources']
+    EventTemplates: ['id','organizationId','name','description','durationMinutes','defaultAreas','defaultResources'],
+    // PR 3a — Operación (entregas/devoluciones) y Mantenimiento
+    Deliveries: ['id','organizationId','requestId','deliveredBy','deliveredAt','siteId','recipientName','notes','idempotencyKey','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    DeliveryItems: ['id','organizationId','deliveryId','resourceId','quantity','returnedAt','returnedBy','returnNotes','returnedQuantity','condition','version'],
+    Maintenance: ['id','organizationId','siteId','resourceId','reportedBy','reportedAt','kind','severity','status','description','resolution','cost','supplierId','startedAt','resolvedAt','sourceDeliveryItemId','createdAt','updatedAt','createdBy','updatedBy','version'],
+    MaintenanceUpdates: ['id','organizationId','maintenanceId','authorId','at','kind','text','version'],
+    // PR 3b — Compras / Cotizaciones
+    Suppliers: ['id','organizationId','name','contactName','email','phone','notes','rating','active','createdAt','updatedAt','createdBy','updatedBy','version'],
+    PurchaseRequests: ['id','organizationId','siteId','needId','title','description','status','requesterId','createdAt','updatedAt','createdBy','updatedBy','version'],
+    PurchaseRequestItems: ['id','organizationId','purchaseRequestId','name','description','quantity','unit','estimatedCost','version'],
+    Quotes: ['id','organizationId','purchaseRequestId','supplierId','price','currency','qualityScore','deliveryDays','warrantyMonths','technicalFitScore','notes','status','submittedAt','version'],
+    PurchaseDecisions: ['id','organizationId','purchaseRequestId','decidedBy','decidedAt','chosenQuoteId','justification','weightConfig','scores','version'],
+    ScoringWeights: ['id','organizationId','name','price','quality','delivery','warranty','supplierHistory','technicalFit','isDefault','createdAt','updatedAt','version'],
+    // PR 3c — Notificaciones
+    Notifications: ['id','organizationId','userId','kind','title','body','link','entityType','entityId','read','createdAt','version']
   };
   function current_() { try { var row = SheetsRepository.findOne('SchemaMeta', function (r) { return r.key === 'schemaVersion'; }); return row ? Number(row.value) : 0; } catch (e) { return 0; } }
   function addColumns_(sheet, expectedHeaders) {

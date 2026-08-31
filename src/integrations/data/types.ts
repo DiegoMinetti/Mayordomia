@@ -120,6 +120,359 @@ export interface EventFilters {
   endBefore?: string;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  PR 3a — Operations (Deliveries / Devoluciones)                           */
+/* -------------------------------------------------------------------------- */
+
+export type DeliveryStatusDto = 'DRAFT' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type ReturnConditionDto = 'OK' | 'DAMAGED' | 'LOST';
+
+export interface DeliveryDto {
+  id: string;
+  organizationId: string;
+  requestId: string;
+  deliveredBy: string;
+  deliveredAt: string;
+  siteId?: string;
+  recipientName: string;
+  notes?: string;
+  status: DeliveryStatusDto;
+  createdAt: string;
+  updatedAt?: string;
+  createdBy: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface DeliveryItemDto {
+  id: string;
+  organizationId: string;
+  deliveryId: string;
+  resourceId: string;
+  resourceName?: string;
+  quantity: number;
+  returnedAt?: string;
+  returnedBy?: string;
+  returnNotes?: string;
+  returnedQuantity?: number;
+  condition?: ReturnConditionDto;
+  version: number;
+}
+
+export interface DeliveryListFilters {
+  status?: DeliveryStatusDto;
+  requestId?: string;
+  since?: string;
+  until?: string;
+}
+
+export interface DeliverPayload {
+  idempotencyKey: string;
+  requestId: string;
+  expectedVersion: number;
+  deliveredBy: string;
+  deliveredAt?: string;
+  siteId?: string;
+  recipientName: string;
+  notes?: string;
+  items: Array<{ resourceId: string; quantity: number }>;
+}
+
+export interface ReturnDeliveryItemPayload {
+  deliveryItemId: string;
+  expectedVersion: number;
+  condition: ReturnConditionDto;
+  returnedBy: string;
+  returnedAt?: string;
+  returnedQuantity?: number;
+  notes?: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3a — Maintenance                                                       */
+/* -------------------------------------------------------------------------- */
+
+export type MaintenanceKindDto = 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION';
+export type MaintenanceSeverityDto = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type MaintenanceStatusDto = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED';
+export type MaintenanceUpdateKindDto = 'NOTE' | 'STATUS' | 'COST' | 'RESOLUTION';
+
+export interface MaintenanceUpdateDto {
+  id: string;
+  organizationId: string;
+  maintenanceId: string;
+  authorId: string;
+  at: string;
+  kind: MaintenanceUpdateKindDto;
+  text: string;
+  createdAt: string;
+  version: number;
+}
+
+export interface MaintenanceDto {
+  id: string;
+  organizationId: string;
+  siteId?: string;
+  resourceId?: string;
+  reportedBy: string;
+  reportedAt: string;
+  kind: MaintenanceKindDto;
+  severity: MaintenanceSeverityDto;
+  status: MaintenanceStatusDto;
+  description: string;
+  resolution?: string;
+  cost?: number;
+  supplierId?: string;
+  startedAt?: string;
+  resolvedAt?: string;
+  sourceDeliveryItemId?: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdBy: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface MaintenanceListFilters {
+  status?: MaintenanceStatusDto;
+  kind?: MaintenanceKindDto;
+  severity?: MaintenanceSeverityDto;
+  resourceId?: string;
+  siteId?: string;
+}
+
+export interface CreateMaintenancePayload {
+  resourceId?: string;
+  siteId?: string;
+  kind: MaintenanceKindDto;
+  severity: MaintenanceSeverityDto;
+  description: string;
+  reportedBy: string;
+  sourceDeliveryItemId?: string;
+}
+
+export interface UpdateMaintenancePayload {
+  id: string;
+  expectedVersion: number;
+  status?: MaintenanceStatusDto;
+  resolution?: string;
+  cost?: number;
+  note?: string;
+  actorId: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Ola 3b — Compras / Proveedores                                            */
+/* -------------------------------------------------------------------------- */
+
+export type PurchaseStatus =
+  'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+export type QuoteStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+
+export interface PurchaseRequestItemDto {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  unit: string;
+  estimatedCost?: number;
+  version: number;
+}
+
+export interface PurchaseRequestDto {
+  id: string;
+  organizationId: string;
+  siteId?: string;
+  needId?: string;
+  title: string;
+  description: string;
+  status: PurchaseStatus;
+  requesterId: string;
+  items?: PurchaseRequestItemDto[];
+  itemCount: number;
+  quoteCount: number;
+  estimatedTotal?: number;
+  createdAt: string;
+  updatedAt?: string;
+  createdBy: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface PurchaseRequestDetailDto {
+  request: PurchaseRequestDto;
+  items: PurchaseRequestItemDto[];
+  quotes: QuoteDto[];
+  decision?: PurchaseDecisionDto;
+}
+
+export interface PurchaseRequestFilters {
+  status?: PurchaseStatus;
+  requesterId?: string;
+  since?: string;
+  until?: string;
+}
+
+export interface CreatePurchaseItemInput {
+  name: string;
+  description?: string;
+  quantity: number;
+  unit?: string;
+  estimatedCost?: number;
+}
+
+export interface CreatePurchaseRequestInput {
+  title: string;
+  description?: string;
+  siteId?: string;
+  needId?: string;
+  requesterId?: string;
+  items: CreatePurchaseItemInput[];
+}
+
+export interface QuoteDto {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  supplierId: string;
+  supplierName?: string;
+  price: number;
+  currency: string;
+  qualityScore: number;
+  deliveryDays: number;
+  warrantyMonths: number;
+  technicalFitScore: number;
+  notes?: string;
+  status: QuoteStatus;
+  submittedAt: string;
+  version: number;
+}
+
+export interface AddQuoteInput {
+  purchaseRequestId: string;
+  supplierId: string;
+  price: number;
+  currency: string;
+  qualityScore: number;
+  deliveryDays: number;
+  warrantyMonths: number;
+  technicalFitScore: number;
+  notes?: string;
+}
+
+export interface PurchaseWeightsDto {
+  price: number;
+  quality: number;
+  delivery: number;
+  warranty: number;
+  supplierHistory: number;
+  technicalFit: number;
+}
+
+export interface ScoreBreakdownEntry {
+  dimension: 'price' | 'quality' | 'delivery' | 'warranty' | 'supplierHistory' | 'technicalFit';
+  label: string;
+  raw: number;
+  weight: number;
+  contribution: number;
+}
+
+export interface QuoteScoreDto {
+  quoteId: string;
+  score: number;
+  breakdown: Record<keyof PurchaseWeightsDto, ScoreBreakdownEntry>;
+}
+
+export interface DecidePurchaseInput {
+  purchaseRequestId: string;
+  chosenQuoteId: string;
+  weights: PurchaseWeightsDto;
+  justification?: string;
+}
+
+export interface DecidePurchaseResult {
+  decision: PurchaseDecisionDto;
+  scores: QuoteScoreDto[];
+  weights: PurchaseWeightsDto;
+}
+
+export interface PurchaseDecisionDto {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  decidedBy: string;
+  decidedAt: string;
+  chosenQuoteId: string;
+  justification?: string;
+  weightConfig?: PurchaseWeightsDto | null;
+  scores?: string;
+  version: number;
+}
+
+export interface SupplierDto {
+  id: string;
+  organizationId: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  rating: number;
+  active: boolean;
+  version: number;
+}
+
+export interface UpsertSupplierInput {
+  id?: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  rating?: number;
+  active?: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 3C — Notifications (in-app)                                            */
+/* -------------------------------------------------------------------------- */
+
+export type NotificationKind =
+  | 'REQUEST_SUBMITTED'
+  | 'REQUEST_APPROVED'
+  | 'REQUEST_REJECTED'
+  | 'MAINTENANCE_OPENED'
+  | 'DELIVERY_CREATED'
+  | 'RETURN_DAMAGED'
+  | 'PURCHASE_DECISION'
+  | 'EVENT_REMINDER'
+  | 'OTHER';
+
+export interface NotificationDto {
+  id: string;
+  organizationId: string;
+  userId?: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  link: string;
+  entityType?: string;
+  entityId?: string;
+  read: boolean;
+  createdAt: string;
+  version: number;
+}
+
+export interface NotificationListFilters {
+  unreadOnly?: boolean;
+  kinds?: NotificationKind[];
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
 /**
  * DTOs for the requests catalog.
  *

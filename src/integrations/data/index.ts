@@ -1,7 +1,29 @@
 export { GatewayClient } from './GatewayClient';
 export type { GatewayClientDeps } from './GatewayClient';
 export { DataClient } from './DataClient';
-export { DataProvider, useDataClient, useRequestsClient, DataContext } from './DataContext';
+export {
+  DataProvider,
+  useDataClient,
+  useRequestsClient,
+  useOperationsClient,
+  useMaintenanceClient,
+  usePurchasesClient,
+  useNotificationsClient,
+  DataContext,
+} from './DataContext';
+export type { DataClients } from './DataContext';
+export { RequestsDataClient, buildDecisionPayload } from './RequestsDataClient';
+export type { RequestDecisionResult } from './RequestsDataClient';
+export { OperationsDataClient } from './OperationsDataClient';
+export type {
+  DeliveryWithItems,
+  DeliverResult,
+  ReturnDeliveryItemResult,
+} from './OperationsDataClient';
+export { MaintenanceDataClient } from './MaintenanceDataClient';
+export type { MaintenanceWithUpdates } from './MaintenanceDataClient';
+export { PurchasesDataClient } from './PurchasesDataClient';
+export { NotificationsDataClient } from './NotificationsDataClient';
 export {
   useOrganization,
   useSites,
@@ -22,9 +44,29 @@ export {
   useEvents,
   useEvent,
   useUpcomingEvents,
+  useDeliveries,
+  useDelivery,
+  useDeliver,
+  useReturnDeliveryItem,
+  useMaintenanceList,
+  useMaintenance,
+  useCreateMaintenance,
+  useUpdateMaintenance,
+  usePurchaseRequests,
+  usePurchaseRequest,
+  useCreatePurchaseRequest,
+  useQuotes,
+  useAddQuote,
+  useDecidePurchase,
+  useSuppliers,
+  useUpsertSupplier,
+  useMyNotifications,
+  useUnreadCount,
+  useMarkRead,
+  useMarkAllRead,
+  NOTIFICATIONS_QUERY_KEY,
+  UNREAD_COUNT_QUERY_KEY,
 } from './hooks';
-export { RequestsDataClient, buildDecisionPayload } from './RequestsDataClient';
-export type { RequestDecisionResult } from './RequestsDataClient';
 export type {
   OrgDto,
   SiteDto,
@@ -71,4 +113,41 @@ export type {
   EventStatus,
   EventResponsibility,
   EventPeopleRole,
+  DeliveryDto,
+  DeliveryItemDto,
+  DeliveryStatusDto,
+  DeliveryListFilters,
+  DeliverPayload,
+  ReturnDeliveryItemPayload,
+  ReturnConditionDto,
+  MaintenanceDto,
+  MaintenanceUpdateDto,
+  MaintenanceListFilters,
+  MaintenanceKindDto,
+  MaintenanceSeverityDto,
+  MaintenanceStatusDto,
+  MaintenanceUpdateKindDto,
+  CreateMaintenancePayload,
+  UpdateMaintenancePayload,
+  PurchaseStatus,
+  QuoteStatus,
+  PurchaseRequestItemDto,
+  PurchaseRequestDto,
+  PurchaseRequestDetailDto,
+  PurchaseRequestFilters,
+  CreatePurchaseItemInput,
+  CreatePurchaseRequestInput,
+  QuoteDto,
+  AddQuoteInput,
+  PurchaseWeightsDto,
+  ScoreBreakdownEntry,
+  QuoteScoreDto,
+  DecidePurchaseInput,
+  DecidePurchaseResult,
+  PurchaseDecisionDto,
+  SupplierDto,
+  UpsertSupplierInput,
+  NotificationKind,
+  NotificationDto,
+  NotificationListFilters,
 } from './types';

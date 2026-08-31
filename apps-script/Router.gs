@@ -58,3 +58,29 @@ Router.register('resources.checkAvailability', { auth: true }, function (payload
 Router.register('events.list', { auth: true }, function (payload, ctx) { return Events.list(payload, ctx); });
 Router.register('events.get', { auth: true }, function (payload, ctx) { return Events.get(payload, ctx); });
 Router.register('events.upcoming', { auth: true }, function (payload, ctx) { return Events.upcoming(payload, ctx); });
+// PR 3a — Operación (entregas/devoluciones). Delivery/return require
+// `delivery.manage`. Optimistic concurrency + idempotency enforced in the module.
+Router.register('operations.listDeliveries', { auth: true, permission: 'delivery.manage' }, function (payload, ctx) { return Operations.listDeliveries(payload, ctx); });
+Router.register('operations.getDelivery', { auth: true, permission: 'delivery.manage' }, function (payload, ctx) { return Operations.getDelivery(payload, ctx); });
+Router.register('operations.deliver', { auth: true, permission: 'delivery.manage', audit: true }, function (payload, ctx) { return Operations.deliver(payload, ctx); });
+Router.register('operations.returnDeliveryItem', { auth: true, permission: 'delivery.manage', audit: true }, function (payload, ctx) { return Operations.returnDeliveryItem(payload, ctx); });
+// PR 3a — Mantenimiento. Update/create require `maintenance.manage`.
+Router.register('maintenance.list', { auth: true }, function (payload, ctx) { return Maintenance.list(payload, ctx); });
+Router.register('maintenance.get', { auth: true }, function (payload, ctx) { return Maintenance.get(payload, ctx); });
+Router.register('maintenance.create', { auth: true, permission: 'maintenance.manage', audit: true }, function (payload, ctx) { return Maintenance.create(payload, ctx); });
+Router.register('maintenance.update', { auth: true, permission: 'maintenance.manage', audit: true }, function (payload, ctx) { return Maintenance.update(payload, ctx); });
+// PR 3b — Compras (procurement end-to-end). All require `purchase.manage`.
+Router.register('purchases.listRequests', { auth: true, permission: 'purchase.manage' }, function (payload, ctx) { return Purchases.listRequests(payload, ctx); });
+Router.register('purchases.getRequest', { auth: true, permission: 'purchase.manage' }, function (payload, ctx) { return Purchases.getRequest(payload, ctx); });
+Router.register('purchases.createRequest', { auth: true, permission: 'purchase.manage', audit: true }, function (payload, ctx) { return Purchases.createRequest(payload, ctx); });
+Router.register('purchases.listQuotes', { auth: true, permission: 'purchase.manage' }, function (payload, ctx) { return Purchases.listQuotes(payload, ctx); });
+Router.register('purchases.addQuote', { auth: true, permission: 'purchase.manage', audit: true }, function (payload, ctx) { return Purchases.addQuote(payload, ctx); });
+Router.register('purchases.decide', { auth: true, permission: 'purchase.manage', audit: true }, function (payload, ctx) { return Purchases.decide(payload, ctx); });
+Router.register('purchases.listSuppliers', { auth: true, permission: 'purchase.manage' }, function (payload, ctx) { return Purchases.listSuppliers(payload, ctx); });
+Router.register('purchases.upsertSupplier', { auth: true, permission: 'purchase.manage', audit: true }, function (payload, ctx) { return Purchases.upsertSupplier(payload, ctx); });
+// PR 3c — Notificaciones in-app. Read endpoints need any authed user.
+Router.register('notifications.listMine', { auth: true }, function (payload, ctx) { return Notifications.listMine(payload, ctx); });
+Router.register('notifications.markRead', { auth: true, audit: true }, function (payload, ctx) { return Notifications.markRead(payload, ctx); });
+Router.register('notifications.markAllRead', { auth: true, audit: true }, function (payload, ctx) { return Notifications.markAllRead(payload, ctx); });
+Router.register('notifications.unreadCount', { auth: true }, function (payload, ctx) { return Notifications.unreadCount(payload, ctx); });
+Router.register('notifications.publish', { auth: true, permission: 'notification.manage', audit: true }, function (payload, ctx) { return Notifications.publish(payload, ctx); });
