@@ -12,8 +12,6 @@ import { LocationsPage } from '../features/locations/LocationsPage';
 import { LocationDetailPage } from '../features/locations/LocationDetailPage';
 
 const pages: Record<string, [string, string]> = {
-  agenda: ['Agenda', 'Eventos, reservas, entregas, devoluciones y tareas en una vista unificada.'],
-  events: ['Eventos', 'El centro operativo de personas, espacios, recursos y tareas.'],
   maintenance: ['Mantenimiento', 'Fallas, reparaciones e inspecciones preventivas.'],
   purchases: ['Compras', 'Necesidades, cotizaciones, scoring explicable y decisiones trazables.'],
   settings: ['Configuración', 'Organización, sedes, áreas, usuarios e integraciones.'],

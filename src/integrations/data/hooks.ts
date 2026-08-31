@@ -4,6 +4,9 @@ import { useDataClient, useRequestsClient } from './DataContext';
 import type {
   AvailabilityItem,
   AvailabilityResult,
+  EventDetailDto,
+  EventDto,
+  EventFilters,
   LocationDto,
   LocationFilters,
   MovementDto,
@@ -40,6 +43,9 @@ const KEYS = {
     ['movements', 'list', orgId, resourceId ?? 'all'] as const,
   availability: (orgId: string, items: AvailabilityItem[]) =>
     ['resources', 'availability', orgId, items] as const,
+  events: (orgId: string, filters: EventFilters) => ['events', 'list', orgId, filters] as const,
+  event: (orgId: string, id: string) => ['events', 'get', orgId, id] as const,
+  upcoming: (orgId: string, days: number) => ['events', 'upcoming', orgId, days] as const,
 };
 
 export function useOrganization(enabled = true) {
@@ -213,5 +219,39 @@ export function useAvailability(items: AvailabilityItem[], enabled = true) {
     enabled: enabled && items.length > 0,
     queryFn: () => client.checkAvailability(items),
     staleTime: 15_000,
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  PR 1C — Eventos / Agenda                                                 */
+/* -------------------------------------------------------------------------- */
+
+export function useEvents(filters: EventFilters = {}, enabled = true) {
+  const client = useDataClient();
+  return useQuery<EventDto[]>({
+    queryKey: [...KEYS.events('current', filters)],
+    enabled,
+    queryFn: () => client.listEvents(filters),
+    staleTime: 30_000,
+  });
+}
+
+export function useEvent(id: string | undefined, enabled = true) {
+  const client = useDataClient();
+  return useQuery<EventDetailDto | null>({
+    queryKey: [...KEYS.event('current', id ?? '_')],
+    enabled: enabled && Boolean(id),
+    queryFn: async () => (id ? ((await client.getEvent(id)) ?? null) : null),
+    staleTime: 30_000,
+  });
+}
+
+export function useUpcomingEvents(daysAhead = 14, enabled = true) {
+  const client = useDataClient();
+  return useQuery<EventDto[]>({
+    queryKey: [...KEYS.upcoming('current', daysAhead)],
+    enabled,
+    queryFn: () => client.upcomingEvents(daysAhead),
+    staleTime: 30_000,
   });
 }

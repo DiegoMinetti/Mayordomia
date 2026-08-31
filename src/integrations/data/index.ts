@@ -19,6 +19,9 @@ export {
   useReservations,
   useMovements,
   useAvailability,
+  useEvents,
+  useEvent,
+  useUpcomingEvents,
 } from './hooks';
 export { RequestsDataClient, buildDecisionPayload } from './RequestsDataClient';
 export type { RequestDecisionResult } from './RequestsDataClient';
@@ -57,4 +60,15 @@ export type {
   ApprovalStatus,
   ApprovalRollup,
   RequestFlagsDto,
+  EventDto,
+  EventDetailDto,
+  EventAreaDto,
+  EventResourceDto,
+  EventPersonDto,
+  EventTemplateDto,
+  EventFilters,
+  EventKind,
+  EventStatus,
+  EventResponsibility,
+  EventPeopleRole,
 } from './types';

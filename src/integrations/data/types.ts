@@ -46,6 +46,80 @@ export interface RoleDto {
   version: number;
 }
 
+export type EventKind = 'SERVICE' | 'REHEARSAL' | 'CLASS' | 'MEETING' | 'OTHER';
+export type EventStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED';
+export type EventResponsibility = 'LEAD' | 'SUPPORT' | 'INFO';
+export type EventPeopleRole = 'LEAD' | 'SUPPORT' | 'ATTENDEE';
+
+export interface EventDto {
+  id: string;
+  organizationId: string;
+  siteId?: string;
+  name: string;
+  description?: string;
+  kind: EventKind;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+  recurrenceRule?: string;
+  parentEventId?: string;
+  status: EventStatus;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+  version: number;
+}
+
+export interface EventAreaDto {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  areaId: string;
+  responsibility: EventResponsibility;
+}
+
+export interface EventResourceDto {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  resourceId: string;
+  quantity: number;
+}
+
+export interface EventPersonDto {
+  id: string;
+  organizationId: string;
+  eventId: string;
+  personId: string;
+  role: EventPeopleRole;
+}
+
+export interface EventTemplateDto {
+  id: string;
+  organizationId: string;
+  name: string;
+  description?: string;
+  durationMinutes: number;
+  defaultAreas?: string[];
+  defaultResources?: Record<string, number>;
+}
+
+export interface EventDetailDto extends EventDto {
+  areas: EventAreaDto[];
+  resources: EventResourceDto[];
+  people: EventPersonDto[];
+  template?: EventTemplateDto;
+}
+
+export interface EventFilters {
+  siteId?: string;
+  status?: EventStatus;
+  kind?: EventKind;
+  startAfter?: string;
+  endBefore?: string;
+}
+
 /**
  * DTOs for the requests catalog.
  *

@@ -2,6 +2,9 @@ import type { GatewayClient } from './GatewayClient';
 import type {
   AvailabilityItem,
   AvailabilityResult,
+  EventDetailDto,
+  EventDto,
+  EventFilters,
   LocationDto,
   LocationFilters,
   MovementDto,
@@ -159,5 +162,39 @@ export class DataClient {
       return { available: { resource: {}, location: {} }, conflicts: [] };
     }
     return res.data;
+  }
+
+  /* ----------------------------------------------------------------------- */
+  /*  PR 1C — Eventos / Agenda                                               */
+  /* ----------------------------------------------------------------------- */
+
+  async listEvents(filters: EventFilters = {}): Promise<EventDto[]> {
+    const res = await this.gateway.call<{ events: EventDto[] }>(
+      'events.list',
+      this.opts.organizationId,
+      filters as Record<string, unknown>,
+    );
+    if (!res.ok) return [];
+    return res.data.events;
+  }
+
+  async getEvent(id: string): Promise<EventDetailDto | undefined> {
+    const res = await this.gateway.call<{ event: EventDetailDto }>(
+      'events.get',
+      this.opts.organizationId,
+      { id },
+    );
+    if (!res.ok) return undefined;
+    return res.data.event;
+  }
+
+  async upcomingEvents(daysAhead = 14): Promise<EventDto[]> {
+    const res = await this.gateway.call<{ events: EventDto[] }>(
+      'events.upcoming',
+      this.opts.organizationId,
+      { days: daysAhead },
+    );
+    if (!res.ok) return [];
+    return res.data.events;
   }
 }

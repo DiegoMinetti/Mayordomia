@@ -17,7 +17,13 @@ var Schema = (function () {
     Resources: ['id','organizationId','siteId','areaId','locationId','categoryId','name','description','inventoryType','status','quantity','unit','brand','model','serialNumber','internalCode','photo','purchaseDate','purchaseCost','supplierId','warrantyUntil','notes','createdAt','updatedAt','createdBy','updatedBy','version'],
     Locations: ['id','organizationId','siteId','name','description','capacity','rules','active','createdAt','updatedAt','createdBy','updatedBy','version'],
     Reservations: ['id','organizationId','kind','targetId','requestId','startAt','endAt','quantity','status','createdAt','updatedAt','createdBy','updatedBy','version'],
-    ResourceMovements: ['id','organizationId','resourceId','type','fromLocationId','toLocationId','fromStatus','toStatus','quantity','actorId','reason','occurredAt']
+    ResourceMovements: ['id','organizationId','resourceId','type','fromLocationId','toLocationId','fromStatus','toStatus','quantity','actorId','reason','occurredAt'],
+    // PR 1C — Eventos
+    Events: ['id','organizationId','siteId','name','description','kind','startAt','endAt','allDay','recurrenceRule','parentEventId','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    EventAreas: ['id','organizationId','eventId','areaId','responsibility'],
+    EventResources: ['id','organizationId','eventId','resourceId','quantity'],
+    EventPeople: ['id','organizationId','eventId','personId','role'],
+    EventTemplates: ['id','organizationId','name','description','durationMinutes','defaultAreas','defaultResources']
   };
   function current_() { try { var row = SheetsRepository.findOne('SchemaMeta', function (r) { return r.key === 'schemaVersion'; }); return row ? Number(row.value) : 0; } catch (e) { return 0; } }
   function addColumns_(sheet, expectedHeaders) {

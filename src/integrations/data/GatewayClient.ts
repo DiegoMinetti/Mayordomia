@@ -71,6 +71,126 @@ function nextId(): string {
   return `mock-${mockCounter.toString().padStart(4, '0')}`;
 }
 
+/**
+ * Deterministic seed used to build mock events with stable timestamps relative
+ * to the current run. The day offsets are pinned so tests don't flake.
+ */
+const MOCK_EVENT_SEED = '2026-09-14T00:00:00.000Z';
+function mockBaseTs(): number {
+  return new Date(MOCK_EVENT_SEED).getTime();
+}
+function mockEventAt(dayOffset: number, hour: number, minute = 0): string {
+  const d = new Date(mockBaseTs() + dayOffset * 86_400_000);
+  d.setUTCHours(hour, minute, 0, 0);
+  return d.toISOString();
+}
+function buildMockEvents(organizationId: string) {
+  return [
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-centro',
+      name: 'Culto principal',
+      description: 'Servicio dominical con presencia completa.',
+      kind: 'SERVICE',
+      startAt: mockEventAt(0, 22, 0),
+      endAt: mockEventAt(0, 23, 30),
+      allDay: false,
+      status: 'PUBLISHED',
+      createdAt: mockEventAt(-7, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-1, 12),
+      updatedBy: 'u-admin',
+      version: 2,
+    },
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-centro',
+      name: 'Ensayo de alabanza',
+      description: 'Ensayo general de la banda.',
+      kind: 'REHEARSAL',
+      startAt: mockEventAt(1, 23, 0),
+      endAt: mockEventAt(1, 24, 0),
+      allDay: false,
+      status: 'PUBLISHED',
+      createdAt: mockEventAt(-5, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-1, 12),
+      updatedBy: 'u-admin',
+      version: 1,
+    },
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-norte',
+      name: 'Escuela dominical',
+      description: 'Clase para todas las edades.',
+      kind: 'CLASS',
+      startAt: mockEventAt(0, 13, 0),
+      endAt: mockEventAt(0, 14, 30),
+      allDay: false,
+      status: 'PUBLISHED',
+      createdAt: mockEventAt(-7, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-1, 12),
+      updatedBy: 'u-admin',
+      version: 1,
+    },
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-centro',
+      name: 'Reunión de líderes',
+      description: 'Planificación del trimestre.',
+      kind: 'MEETING',
+      startAt: mockEventAt(2, 19, 0),
+      endAt: mockEventAt(2, 21, 0),
+      allDay: false,
+      status: 'DRAFT',
+      createdAt: mockEventAt(-1, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-1, 12),
+      updatedBy: 'u-admin',
+      version: 1,
+    },
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-centro',
+      name: 'Conferencia anual',
+      description: 'Tres días de capacitación.',
+      kind: 'OTHER',
+      startAt: mockEventAt(10, 13, 0),
+      endAt: mockEventAt(12, 22, 0),
+      allDay: false,
+      status: 'PUBLISHED',
+      createdAt: mockEventAt(-14, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-1, 12),
+      updatedBy: 'u-admin',
+      version: 3,
+    },
+    {
+      id: nextId(),
+      organizationId,
+      siteId: 'site-centro',
+      name: 'Culto pasado',
+      description: 'Servicio ya realizado.',
+      kind: 'SERVICE',
+      startAt: mockEventAt(-3, 22, 0),
+      endAt: mockEventAt(-3, 23, 30),
+      allDay: false,
+      status: 'COMPLETED',
+      createdAt: mockEventAt(-10, 12),
+      createdBy: 'u-admin',
+      updatedAt: mockEventAt(-3, 23, 30),
+      updatedBy: 'u-admin',
+      version: 1,
+    },
+  ];
+}
+
 export interface RequestMockSnapshot {
   requests: unknown[];
   approvals: unknown[];
@@ -926,6 +1046,79 @@ function mockDispatch<T>(
         if (it.locationId) available.location[it.locationId] = true;
       });
       return { ok: true, data: { available, conflicts: [] } as T };
+    }
+    case 'events.list': {
+      const events = buildMockEvents(organizationId);
+      return { ok: true, data: { events } as T };
+    }
+    case 'events.get': {
+      const events = buildMockEvents(organizationId);
+      const event = events[0];
+      return {
+        ok: true,
+        data: {
+          event: {
+            ...event,
+            areas: [
+              {
+                id: nextId(),
+                organizationId,
+                eventId: event.id,
+                areaId: 'area-alabanza',
+                responsibility: 'LEAD',
+              },
+              {
+                id: nextId(),
+                organizationId,
+                eventId: event.id,
+                areaId: 'area-ninos',
+                responsibility: 'SUPPORT',
+              },
+            ],
+            resources: [
+              {
+                id: nextId(),
+                organizationId,
+                eventId: event.id,
+                resourceId: 'res-sonido',
+                quantity: 1,
+              },
+              {
+                id: nextId(),
+                organizationId,
+                eventId: event.id,
+                resourceId: 'res-sillas',
+                quantity: 80,
+              },
+            ],
+            people: [
+              { id: nextId(), organizationId, eventId: event.id, personId: 'p-dir1', role: 'LEAD' },
+              {
+                id: nextId(),
+                organizationId,
+                eventId: event.id,
+                personId: 'p-vol1',
+                role: 'ATTENDEE',
+              },
+            ],
+            template: {
+              id: nextId(),
+              organizationId,
+              name: 'Plantilla Culto',
+              description: 'Esqueleto estándar de servicio dominical.',
+              durationMinutes: 90,
+              defaultAreas: ['area-alabanza', 'area-ninos'],
+              defaultResources: { 'res-sonido': 1, 'res-sillas': 100 },
+            },
+          },
+        } as T,
+      };
+    }
+    case 'events.upcoming': {
+      const events = buildMockEvents(organizationId).filter(
+        (e) => new Date(e.endAt).getTime() >= Date.now(),
+      );
+      return { ok: true, data: { events } as T };
     }
     default:
       return { ok: false, error: { code: 'UNKNOWN_ACTION', message: `Mock no soporta ${action}` } };

@@ -53,3 +53,8 @@ Router.register('resources.getLocation', { auth: true }, function (payload, ctx)
 Router.register('resources.listReservations', { auth: true }, function (payload, ctx) { return Resources.listReservations(payload, ctx); });
 Router.register('resources.listMovements', { auth: true }, function (payload, ctx) { return Resources.listMovements(payload, ctx); });
 Router.register('resources.checkAvailability', { auth: true }, function (payload, ctx) { return Resources.checkAvailability(payload, ctx); });
+// PR 1C — Eventos (read endpoints). Auth required; reads are scoped to the
+// caller's organization in Events.gs. Write endpoints land in a follow-up PR.
+Router.register('events.list', { auth: true }, function (payload, ctx) { return Events.list(payload, ctx); });
+Router.register('events.get', { auth: true }, function (payload, ctx) { return Events.get(payload, ctx); });
+Router.register('events.upcoming', { auth: true }, function (payload, ctx) { return Events.upcoming(payload, ctx); });
