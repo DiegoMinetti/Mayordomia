@@ -8,12 +8,12 @@ export interface DataClients {
   requests: RequestsDataClient;
 }
 
+/** Exposed for tests so they can wrap a fake client. Prefer the hooks. */
 const DataContext = createContext<DataClients | null>(null);
-/** Exposed for tests that need to inject a mock client. Prefer the hooks. */
 export { DataContext };
 
 export interface DataProviderProps {
-  /** Per-organization data client. The provider creates it lazily from deps + org. */
+  /** Per-organization data clients. The provider creates them lazily from deps + org. */
   deps: GatewayClientDeps;
   organizationId: string;
   children: ReactNode;

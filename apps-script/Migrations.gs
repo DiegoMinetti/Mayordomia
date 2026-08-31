@@ -12,7 +12,12 @@ var Schema = (function () {
     Requests: ['id','organizationId','siteId','type','kind','requesterName','requesterEmail','description','requestedFor','source','status','eventStart','eventEnd','urgencyReason','lateReason','currentArea','createdAt','updatedAt','createdBy','updatedBy','version'],
     RequestApprovals: ['id','organizationId','requestId','scope','areaId','status','reviewedBy','reviewedAt','comment','createdAt','updatedAt','createdBy','updatedBy','version'],
     AuditLog: ['id','organizationId','actorId','actorType','action','entityType','entityId','requestId','occurredAt','metadataJson'],
-    EmailQueue: ['id','organizationId','to','subject','html','dedupeKey','status','attempts','nextAttemptAt','createdAt','lastError']
+    EmailQueue: ['id','organizationId','to','subject','html','dedupeKey','status','attempts','nextAttemptAt','createdAt','lastError'],
+    // PR 1B — Recursos / Espacios
+    Resources: ['id','organizationId','siteId','areaId','locationId','categoryId','name','description','inventoryType','status','quantity','unit','brand','model','serialNumber','internalCode','photo','purchaseDate','purchaseCost','supplierId','warrantyUntil','notes','createdAt','updatedAt','createdBy','updatedBy','version'],
+    Locations: ['id','organizationId','siteId','name','description','capacity','rules','active','createdAt','updatedAt','createdBy','updatedBy','version'],
+    Reservations: ['id','organizationId','kind','targetId','requestId','startAt','endAt','quantity','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    ResourceMovements: ['id','organizationId','resourceId','type','fromLocationId','toLocationId','fromStatus','toStatus','quantity','actorId','reason','occurredAt']
   };
   function current_() { try { var row = SheetsRepository.findOne('SchemaMeta', function (r) { return r.key === 'schemaVersion'; }); return row ? Number(row.value) : 0; } catch (e) { return 0; } }
   function addColumns_(sheet, expectedHeaders) {

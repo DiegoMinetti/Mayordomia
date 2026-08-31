@@ -6,12 +6,14 @@ import { SetupPage } from '../features/setup/SetupPage';
 import { PlaceholderPage } from '../components/PlaceholderPage';
 import { RequestsPage } from '../features/requests/RequestsPage';
 import { RequestDetailPage } from '../features/requests/RequestDetailPage';
+import { ResourcesPage } from '../features/resources/ResourcesPage';
+import { ResourceDetailPage } from '../features/resources/ResourceDetailPage';
+import { LocationsPage } from '../features/locations/LocationsPage';
+import { LocationDetailPage } from '../features/locations/LocationDetailPage';
 
 const pages: Record<string, [string, string]> = {
   agenda: ['Agenda', 'Eventos, reservas, entregas, devoluciones y tareas en una vista unificada.'],
   events: ['Eventos', 'El centro operativo de personas, espacios, recursos y tareas.'],
-  resources: ['Recursos', 'Inventario serializado y por cantidad con historial de movimientos.'],
-  locations: ['Espacios', 'Disponibilidad, capacidad y reglas de reserva.'],
   maintenance: ['Mantenimiento', 'Fallas, reparaciones e inspecciones preventivas.'],
   purchases: ['Compras', 'Necesidades, cotizaciones, scoring explicable y decisiones trazables.'],
   settings: ['Configuración', 'Organización, sedes, áreas, usuarios e integraciones.'],
@@ -25,6 +27,10 @@ export function App() {
         <Route index element={<DashboardPage />} />
         <Route path="requests" element={<RequestsPage />} />
         <Route path="requests/:id" element={<RequestDetailPage />} />
+        <Route path="resources" element={<ResourcesPage />} />
+        <Route path="resources/:id" element={<ResourceDetailPage />} />
+        <Route path="locations" element={<LocationsPage />} />
+        <Route path="locations/:id" element={<LocationDetailPage />} />
         {Object.entries(pages).map(([path, [title, desc]]) => (
           <Route
             key={path}

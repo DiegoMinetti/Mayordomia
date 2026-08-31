@@ -1,7 +1,7 @@
 export { GatewayClient } from './GatewayClient';
 export type { GatewayClientDeps } from './GatewayClient';
 export { DataClient } from './DataClient';
-export { DataProvider, useDataClient, useRequestsClient } from './DataContext';
+export { DataProvider, useDataClient, useRequestsClient, DataContext } from './DataContext';
 export {
   useOrganization,
   useSites,
@@ -11,6 +11,14 @@ export {
   useRequest,
   useApproveRequest,
   useRejectRequest,
+  useResources,
+  useResource,
+  useResourceMovements,
+  useLocations,
+  useLocation,
+  useReservations,
+  useMovements,
+  useAvailability,
 } from './hooks';
 export { RequestsDataClient, buildDecisionPayload } from './RequestsDataClient';
 export type { RequestDecisionResult } from './RequestsDataClient';
@@ -19,6 +27,21 @@ export type {
   SiteDto,
   UserDto,
   RoleDto,
+  ResourceDto,
+  ResourceFilters,
+  ResourceInventoryType,
+  ResourceStatusDto,
+  LocationDto,
+  LocationFilters,
+  ReservationDto,
+  ReservationFilters,
+  ReservationKind,
+  ReservationStatusDto,
+  MovementDto,
+  MovementType,
+  AvailabilityItem,
+  AvailabilityResult,
+  AvailabilityConflict,
   GatewayEnvelope,
   GatewayError,
   GatewayResponse,
