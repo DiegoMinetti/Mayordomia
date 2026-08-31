@@ -41,6 +41,7 @@ import {
 } from '@mui/material';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../integrations/auth';
+import { useCurrentOrg } from '../integrations/org';
 
 const nav = [
   { to: '/', label: 'Inicio', icon: Dashboard },
@@ -60,6 +61,7 @@ export function AppShell() {
   const loc = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, user, signIn, signOut, error } = useAuth();
+  const { organizationId, setOrganizationId, available: availableOrgs } = useCurrentOrg();
   const drawer = (
     <Box>
       <Toolbar>
@@ -113,13 +115,25 @@ export function AppShell() {
           </IconButton>
           <Select
             size="small"
-            value="central"
+            value={organizationId ?? ''}
             IconComponent={ExpandMore}
+            onChange={(e) => setOrganizationId(String(e.target.value))}
             sx={{ minWidth: 180, ml: 1 }}
             aria-label="Organización"
-            disabled={!isAuthenticated}
+            disabled={!isAuthenticated || availableOrgs.length === 0}
+            displayEmpty
           >
-            <MenuItem value="central">Congregación Central</MenuItem>
+            {availableOrgs.length === 0 ? (
+              <MenuItem value="" disabled>
+                {isAuthenticated ? 'Sin organizaciones' : 'Iniciá sesión'}
+              </MenuItem>
+            ) : (
+              availableOrgs.map((org) => (
+                <MenuItem key={org.organizationId} value={org.organizationId}>
+                  {org.name}
+                </MenuItem>
+              ))
+            )}
           </Select>
           <Box flex={1} />
           {isAuthenticated && user ? (

@@ -2,10 +2,11 @@ var Schema = (function () {
   var VERSION = 1;
   var TABLES = {
     SchemaMeta: ['key','value','updatedAt'],
-    Organizations: ['id','name','status','createdAt'],
-    Users: ['id','organizationId','email','personId','status','createdAt'],
-    Roles: ['id','organizationId','name','status'],
-    UserRoles: ['id','organizationId','userId','roleId','siteId'],
+    Organizations: ['id','name','timezone','active','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    Sites: ['id','organizationId','name','address','active','createdAt','updatedAt','createdBy','updatedBy','version'],
+    Users: ['id','organizationId','email','name','picture','personId','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    Roles: ['id','organizationId','name','permissionIds','status','createdAt','updatedAt','createdBy','updatedBy','version'],
+    UserRoles: ['id','organizationId','userId','roleId','siteId','createdAt'],
     RolePermissions: ['id','organizationId','roleId','permission'],
     PublicAccessTokens: ['id','organizationId','siteId','tokenHash','status','createdAt'],
     Requests: ['id','organizationId','siteId','type','requesterName','requesterEmail','description','requestedFor','source','status','createdAt'],

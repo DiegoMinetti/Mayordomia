@@ -7,7 +7,13 @@ import { registerSW } from 'virtual:pwa-register';
 import { App } from './app/App';
 import { theme } from './app/theme';
 import { AuthContextProvider, GoogleIdentityAuthProvider } from './integrations/auth';
-import { createBootstrapClient, OrgProvider } from './integrations/org';
+import {
+  createBootstrapClient,
+  CurrentOrgProvider,
+  OrgProvider,
+  useCurrentOrg,
+} from './integrations/org';
+import { DataProvider } from './integrations/data';
 import './app/global.css';
 
 registerSW({ immediate: true });
@@ -26,6 +32,27 @@ const bootstrapClient = createBootstrapClient({
   mock: useMockPublic || !appsScriptUrl,
 });
 
+const gatewayDeps = {
+  appsScriptUrl,
+  getAccessToken: () => authProvider.getValidAccessToken(),
+  mock: useMockPublic || !appsScriptUrl,
+};
+
+function InnerProviders({ children }: { children: React.ReactNode }) {
+  const { organizationId, ready } = useCurrentOrg();
+  if (!ready || !organizationId) {
+    // While discovery is loading or the user has no org yet, render the app
+    // without a DataProvider. Modules that need data will show their own
+    // empty state.
+    return <>{children}</>;
+  }
+  return (
+    <DataProvider deps={gatewayDeps} organizationId={organizationId}>
+      {children}
+    </DataProvider>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
@@ -33,9 +60,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <AuthContextProvider provider={authProvider}>
           <OrgProvider client={bootstrapClient}>
-            <BrowserRouter basename={import.meta.env.BASE_URL}>
-              <App />
-            </BrowserRouter>
+            <CurrentOrgProvider>
+              <InnerProviders>
+                <BrowserRouter basename={import.meta.env.BASE_URL}>
+                  <App />
+                </BrowserRouter>
+              </InnerProviders>
+            </CurrentOrgProvider>
           </OrgProvider>
         </AuthContextProvider>
       </QueryClientProvider>

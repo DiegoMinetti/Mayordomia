@@ -29,3 +29,11 @@ Router.register('emails.process', { auth: true, permission: 'notification.manage
 // new organization can create the org.
 Router.register('bootstrap.organization', { identity: true, audit: true }, function (payload, ctx) { return Bootstrap.organization(payload, ctx); });
 Router.register('org.listMine', { identity: true }, function (payload, ctx) { return Bootstrap.listMine(payload, ctx); });
+// Catalog read endpoints (org, sites, users, roles). Auth required; permission
+// gate is intentionally lax in this PR (just auth.member) — fine-grained
+// permission routing lands once write endpoints exist.
+Router.register('catalog.organization', { auth: true }, function (payload, ctx) { return Catalog.organization(payload, ctx); });
+Router.register('catalog.listOrganizations', { auth: true }, function (payload, ctx) { return Catalog.listOrganizations(payload, ctx); });
+Router.register('catalog.listSites', { auth: true }, function (payload, ctx) { return Catalog.listSites(payload, ctx); });
+Router.register('catalog.listUsers', { auth: true }, function (payload, ctx) { return Catalog.listUsers(payload, ctx); });
+Router.register('catalog.listRoles', { auth: true }, function (payload, ctx) { return Catalog.listRoles(payload, ctx); });
