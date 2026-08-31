@@ -6,6 +6,8 @@ import {
   ExpandMore,
   Handyman,
   Inventory2,
+  Login as LoginIcon,
+  Logout as LogoutIcon,
   Menu,
   MoreHoriz,
   Notifications,
@@ -15,10 +17,13 @@ import {
 } from '@mui/icons-material';
 import {
   AppBar,
+  Avatar,
   Badge,
   Box,
   BottomNavigation,
   BottomNavigationAction,
+  Button,
+  Chip,
   Drawer,
   IconButton,
   List,
@@ -29,11 +34,13 @@ import {
   Select,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../integrations/auth';
 
 const nav = [
   { to: '/', label: 'Inicio', icon: Dashboard },
@@ -52,6 +59,7 @@ export function AppShell() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading, user, signIn, signOut, error } = useAuth();
   const drawer = (
     <Box>
       <Toolbar>
@@ -109,10 +117,47 @@ export function AppShell() {
             IconComponent={ExpandMore}
             sx={{ minWidth: 180, ml: 1 }}
             aria-label="Organización"
+            disabled={!isAuthenticated}
           >
             <MenuItem value="central">Congregación Central</MenuItem>
           </Select>
           <Box flex={1} />
+          {isAuthenticated && user ? (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 1 }}>
+              <Chip
+                avatar={<Avatar src={user.picture} alt={user.name ?? user.email} />}
+                label={user.name ?? user.email}
+                variant="outlined"
+                size="small"
+              />
+              <Tooltip title="Cerrar sesión">
+                <IconButton onClick={() => void signOut()} aria-label="Cerrar sesión">
+                  <LogoutIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ) : (
+            <Tooltip
+              title={
+                error?.code === 'NOT_CONFIGURED'
+                  ? 'Configurá VITE_GOOGLE_CLIENT_ID para habilitar el login'
+                  : 'Iniciar sesión con Google'
+              }
+            >
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LoginIcon />}
+                  onClick={() => void signIn()}
+                  disabled={isLoading || error?.code === 'NOT_CONFIGURED'}
+                  sx={{ mr: 1 }}
+                >
+                  Iniciar sesión
+                </Button>
+              </span>
+            </Tooltip>
+          )}
           <IconButton aria-label="3 notificaciones">
             <Badge badgeContent={3} color="error">
               <Notifications />
