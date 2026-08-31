@@ -4,10 +4,11 @@ import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { PublicRequestPage } from '../features/public/PublicRequestPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { PlaceholderPage } from '../components/PlaceholderPage';
+import { RequestsPage } from '../features/requests/RequestsPage';
+import { RequestDetailPage } from '../features/requests/RequestDetailPage';
 
 const pages: Record<string, [string, string]> = {
   agenda: ['Agenda', 'Eventos, reservas, entregas, devoluciones y tareas en una vista unificada.'],
-  requests: ['Solicitudes', 'Revisión, aprobaciones por área y seguimiento operativo.'],
   events: ['Eventos', 'El centro operativo de personas, espacios, recursos y tareas.'],
   resources: ['Recursos', 'Inventario serializado y por cantidad con historial de movimientos.'],
   locations: ['Espacios', 'Disponibilidad, capacidad y reglas de reserva.'],
@@ -22,6 +23,8 @@ export function App() {
       <Route path="/setup" element={<SetupPage />} />
       <Route element={<AppShell />}>
         <Route index element={<DashboardPage />} />
+        <Route path="requests" element={<RequestsPage />} />
+        <Route path="requests/:id" element={<RequestDetailPage />} />
         {Object.entries(pages).map(([path, [title, desc]]) => (
           <Route
             key={path}

@@ -37,3 +37,10 @@ Router.register('catalog.listOrganizations', { auth: true }, function (payload, 
 Router.register('catalog.listSites', { auth: true }, function (payload, ctx) { return Catalog.listSites(payload, ctx); });
 Router.register('catalog.listUsers', { auth: true }, function (payload, ctx) { return Catalog.listUsers(payload, ctx); });
 Router.register('catalog.listRoles', { auth: true }, function (payload, ctx) { return Catalog.listRoles(payload, ctx); });
+// Requests catalog: list/get require `request.review`; approve/reject
+// require the matching scope permission (`request.approve.area` / `.general`).
+// All write paths check `expectedVersion` for optimistic concurrency.
+Router.register('requests.list', { auth: true, permission: 'request.review' }, function (payload, ctx) { return Requests.list(payload, ctx); });
+Router.register('requests.get', { auth: true, permission: 'request.review' }, function (payload, ctx) { return Requests.get(payload, ctx); });
+Router.register('requests.approve', { auth: true, audit: true }, function (payload, ctx) { return Requests.approve(payload, ctx); });
+Router.register('requests.reject', { auth: true, audit: true }, function (payload, ctx) { return Requests.reject(payload, ctx); });

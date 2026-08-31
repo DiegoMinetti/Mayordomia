@@ -1,5 +1,5 @@
 var Schema = (function () {
-  var VERSION = 1;
+  var VERSION = 2;
   var TABLES = {
     SchemaMeta: ['key','value','updatedAt'],
     Organizations: ['id','name','timezone','active','status','createdAt','updatedAt','createdBy','updatedBy','version'],
@@ -9,17 +9,34 @@ var Schema = (function () {
     UserRoles: ['id','organizationId','userId','roleId','siteId','createdAt'],
     RolePermissions: ['id','organizationId','roleId','permission'],
     PublicAccessTokens: ['id','organizationId','siteId','tokenHash','status','createdAt'],
-    Requests: ['id','organizationId','siteId','type','requesterName','requesterEmail','description','requestedFor','source','status','createdAt'],
+    Requests: ['id','organizationId','siteId','type','kind','requesterName','requesterEmail','description','requestedFor','source','status','eventStart','eventEnd','urgencyReason','lateReason','currentArea','createdAt','updatedAt','createdBy','updatedBy','version'],
+    RequestApprovals: ['id','organizationId','requestId','scope','areaId','status','reviewedBy','reviewedAt','comment','createdAt','updatedAt','createdBy','updatedBy','version'],
     AuditLog: ['id','organizationId','actorId','actorType','action','entityType','entityId','requestId','occurredAt','metadataJson'],
     EmailQueue: ['id','organizationId','to','subject','html','dedupeKey','status','attempts','nextAttemptAt','createdAt','lastError']
   };
   function current_() { try { var row = SheetsRepository.findOne('SchemaMeta', function (r) { return r.key === 'schemaVersion'; }); return row ? Number(row.value) : 0; } catch (e) { return 0; } }
+  function addColumns_(sheet, expectedHeaders) {
+    if (!sheet) return;
+    var lastCol = sheet.getLastColumn();
+    if (lastCol === 0) { sheet.appendRow(expectedHeaders); return; }
+    var existing = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+    var existingSet = {}; existing.forEach(function (h) { existingSet[h] = true; });
+    var missing = expectedHeaders.filter(function (h) { return !existingSet[h]; });
+    if (!missing.length) return;
+    sheet.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
+  }
   function migrate() {
     var lock = LockService.getScriptLock(); lock.waitLock(10000);
     try {
       var from = current_(); if (from >= VERSION) return { from: from, to: VERSION, changed: false };
       var db = SheetsRepository.db(); var backup = DriveApp.getFileById(db.getId()).makeCopy(db.getName() + ' backup pre-migration v' + VERSION + ' ' + new Date().toISOString());
       Object.keys(TABLES).forEach(function (name) { SheetsRepository.ensure(name, TABLES[name]); });
+      // Additive: when upgrading from v1, the Requests sheet already exists with
+      // the original columns. Append the new ones instead of overwriting.
+      if (from > 0 && from < VERSION) {
+        var requestsSheet = db.getSheetByName('Requests');
+        addColumns_(requestsSheet, TABLES.Requests);
+      }
       var meta = db.getSheetByName('SchemaMeta'); var values = meta.getDataRange().getValues(); var found = false;
       for (var i = 1; i < values.length; i++) if (values[i][0] === 'schemaVersion') { meta.getRange(i + 1, 2, 1, 2).setValues([[VERSION, new Date().toISOString()]]); found = true; }
       if (!found) meta.appendRow(['schemaVersion', VERSION, new Date().toISOString()]);

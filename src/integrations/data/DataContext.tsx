@@ -1,8 +1,16 @@
 import { createContext, ReactNode, useContext, useMemo } from 'react';
 import { DataClient } from './DataClient';
 import { GatewayClient, type GatewayClientDeps } from './GatewayClient';
+import { RequestsDataClient } from './RequestsDataClient';
 
-const DataContext = createContext<DataClient | null>(null);
+export interface DataClients {
+  catalog: DataClient;
+  requests: RequestsDataClient;
+}
+
+const DataContext = createContext<DataClients | null>(null);
+/** Exposed for tests that need to inject a mock client. Prefer the hooks. */
+export { DataContext };
 
 export interface DataProviderProps {
   /** Per-organization data client. The provider creates it lazily from deps + org. */
@@ -12,15 +20,24 @@ export interface DataProviderProps {
 }
 
 export function DataProvider({ deps, organizationId, children }: DataProviderProps) {
-  const client = useMemo(() => {
+  const clients = useMemo<DataClients>(() => {
     const gw = new GatewayClient(deps);
-    return new DataClient(gw, { organizationId });
+    return {
+      catalog: new DataClient(gw, { organizationId }),
+      requests: new RequestsDataClient(gw, { organizationId }),
+    };
   }, [deps, organizationId]);
-  return <DataContext.Provider value={client}>{children}</DataContext.Provider>;
+  return <DataContext.Provider value={clients}>{children}</DataContext.Provider>;
 }
 
 export function useDataClient(): DataClient {
   const ctx = useContext(DataContext);
   if (!ctx) throw new Error('useDataClient must be used inside <DataProvider>');
-  return ctx;
+  return ctx.catalog;
+}
+
+export function useRequestsClient(): RequestsDataClient {
+  const ctx = useContext(DataContext);
+  if (!ctx) throw new Error('useRequestsClient must be used inside <DataProvider>');
+  return ctx.requests;
 }

@@ -46,6 +46,121 @@ export interface RoleDto {
   version: number;
 }
 
+/**
+ * DTOs for the requests catalog.
+ *
+ * Mirrors the JSON shape returned by `apps-script/Requests.gs` so the
+ * frontend can render and operate on requests without re-deriving fields.
+ * These are intentionally separate from the domain types in
+ * `src/domain/request.ts`; the domain module is responsible for the
+ * mapping/conversion.
+ */
+export type RequestStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'PENDING_AREA_APPROVAL'
+  | 'PENDING_GENERAL_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export type RequestType =
+  | 'RESOURCE'
+  | 'LOCATION'
+  | 'AUDIO'
+  | 'MULTIMEDIA'
+  | 'LIGHTING'
+  | 'SUPPORT'
+  | 'MAINTENANCE'
+  | 'PURCHASE'
+  | 'OTHER';
+
+export type RequestSource = 'PUBLIC_QR' | 'INTERNAL' | 'ADMIN' | 'IMPORTED';
+
+export type ApprovalScope = 'AREA' | 'GENERAL';
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface RequestApprovalDto {
+  id: string;
+  requestId: string;
+  scope: ApprovalScope;
+  areaId?: string;
+  status: ApprovalStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  comment?: string;
+  createdAt: string;
+  updatedAt?: string;
+  version: number;
+}
+
+export interface RequestTimelineEventDto {
+  at: string;
+  kind: 'CREATED' | 'APPROVED' | 'REJECTED' | 'STATUS_CHANGED';
+  actor: string;
+  label: string;
+  scope?: ApprovalScope;
+  areaId?: string;
+  comment?: string;
+}
+
+export type ApprovalRollup = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface RequestFlagsDto {
+  needsAreaApproval: boolean;
+  needsGeneralApproval: boolean;
+}
+
+export interface RequestDto {
+  id: string;
+  organizationId: string;
+  siteId?: string;
+  type: RequestType;
+  kind?: string;
+  requesterName: string;
+  requesterEmail?: string;
+  description: string;
+  requestedFor?: string;
+  source: RequestSource;
+  status: RequestStatus;
+  eventStart?: string;
+  eventEnd?: string;
+  urgencyReason?: string;
+  lateReason?: string;
+  currentArea?: string;
+  createdAt: string;
+  updatedAt?: string;
+  version: number;
+  approvalSummary?: { area: ApprovalRollup; general: ApprovalRollup };
+  needsAreaApproval?: boolean;
+  needsGeneralApproval?: boolean;
+  approvals?: RequestApprovalDto[];
+  timeline?: RequestTimelineEventDto[];
+  flags?: RequestFlagsDto;
+}
+
+export interface RequestListFilters {
+  status?: RequestStatus;
+  type?: RequestType;
+  siteId?: string;
+  since?: string;
+  until?: string;
+}
+
+export interface RequestDecisionPayload {
+  id: string;
+  scope: ApprovalScope;
+  expectedVersion: number;
+  comment?: string;
+}
+
+export interface RequestGatewayEnvelope<T> {
+  ok: true;
+  data: T;
+  error?: null;
+}
+
 export interface GatewayEnvelope<T> {
   ok: true;
   data: T;

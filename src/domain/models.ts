@@ -74,6 +74,57 @@ export interface RequestApproval extends Entity {
   comment?: string;
 }
 
+export type RequestType =
+  | 'RESOURCE'
+  | 'LOCATION'
+  | 'AUDIO'
+  | 'MULTIMEDIA'
+  | 'LIGHTING'
+  | 'SUPPORT'
+  | 'MAINTENANCE'
+  | 'PURCHASE'
+  | 'OTHER';
+
+export type RequestKind = 'PHYSICAL' | 'SERVICE' | 'MAINTENANCE' | 'PURCHASE';
+
+export type RequestStatus =
+  | 'DRAFT'
+  | 'PENDING'
+  | 'PENDING_AREA_APPROVAL'
+  | 'PENDING_GENERAL_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
+export type RequestSource = 'PUBLIC_QR' | 'INTERNAL' | 'ADMIN' | 'IMPORTED';
+
+export interface RequestTimelineEvent {
+  at: string;
+  kind: 'CREATED' | 'APPROVED' | 'REJECTED' | 'STATUS_CHANGED';
+  actor: UUID;
+  label: string;
+  scope?: ApprovalScope;
+  areaId?: UUID;
+  comment?: string;
+}
+
+export interface RequestEntity extends Entity {
+  type: RequestType;
+  kind?: RequestKind;
+  requesterName: string;
+  requesterEmail?: string;
+  description: string;
+  requestedFor?: string;
+  source: RequestSource;
+  status: RequestStatus;
+  eventStart?: string;
+  eventEnd?: string;
+  urgencyReason?: string;
+  lateReason?: string;
+  currentArea?: UUID;
+}
+
 export interface CalendarEventLink extends Entity {
   eventId: UUID;
   calendarId: string;
