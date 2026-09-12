@@ -255,6 +255,8 @@ var Purchases = (function () {
         status: newStatus, updatedAt: now, updatedBy: userId, version: Number(q.version || 1) + 1,
       });
     });
+    // Best-effort fan-out to the in-app notification center.
+    publishPurchaseDecisionNotification_(request, decisionRecord, chosenQuoteId, ctx);
     AuditService.record({
       organizationId: ctx.auth.organizationId, actorId: userId, actorType: 'USER',
       action: 'purchase.decide', entityType: 'PurchaseRequest', entityId: requestId,
@@ -540,4 +542,34 @@ var Purchases = (function () {
     addQuote: addQuote,
     decide: decide,
   };
+
+  // Best-effort fan-out to the in-app notification center. Wrapped in
+  // try/catch so a notification failure never breaks the decide flow.
+  function publishPurchaseDecisionNotification_(request, decisionRecord, chosenQuoteId, ctx) {
+    try {
+      var title = 'Decisión de compra registrada';
+      var body =
+        String(request.title || 'Solicitud de compra') +
+        ' → elegida cotización ' +
+        String(chosenQuoteId);
+      Notifications.publish(
+        {
+          organizationId: ctx.auth.organizationId,
+          userId: null,
+          kind: 'PURCHASE_DECISION',
+          title: title,
+          body: body.slice(0, 200),
+          link: '/purchases/' + String(request.id),
+          entityType: 'PurchaseRequest',
+          entityId: String(request.id),
+        },
+        {
+          auth: { user: { id: 'system' }, organizationId: ctx.auth.organizationId },
+          requestId: ctx.requestId,
+        }
+      );
+    } catch (e) {
+      console.error('publishPurchaseDecisionNotification_ failed: ' + e);
+    }
+  }
 })();

@@ -269,6 +269,8 @@ var Operations = (function () {
         version: 1,
       });
       maintenanceId = m.id;
+      // Best-effort fan-out to the in-app notification center.
+      publishMaintenanceOpenedNotification_(m, ctx);
     }
     // Recompute delivery status: if every item is now returned -> COMPLETED.
     var allItems = SheetsRepository.rows('DeliveryItems').filter(function (it) {
@@ -557,4 +559,29 @@ var Operations = (function () {
     // shared truth table in src/domain/operations.ts.
     applyReturnCondition_: applyReturnCondition_,
   };
+
+  // Best-effort fan-out to the in-app notification center. Wrapped in
+  // try/catch so a notification failure never breaks the return flow.
+  function publishMaintenanceOpenedNotification_(maintenanceRecord, ctx) {
+    try {
+      Notifications.publish(
+        {
+          organizationId: ctx.auth.organizationId,
+          userId: null,
+          kind: 'MAINTENANCE_OPENED',
+          title: 'Nuevo mantenimiento abierto',
+          body: String(maintenanceRecord.description || 'Devolución con daños').slice(0, 200),
+          link: '/maintenance/' + String(maintenanceRecord.id),
+          entityType: 'Maintenance',
+          entityId: String(maintenanceRecord.id),
+        },
+        {
+          auth: { user: { id: 'system' }, organizationId: ctx.auth.organizationId },
+          requestId: ctx.requestId,
+        }
+      );
+    } catch (e) {
+      console.error('publishMaintenanceOpenedNotification_ failed: ' + e);
+    }
+  }
 })();

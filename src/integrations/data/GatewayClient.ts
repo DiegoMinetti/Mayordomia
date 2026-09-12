@@ -683,6 +683,774 @@ function mockLocations_(organizationId: string) {
   ];
 }
 
+// --------------------------------------------------------------------------- //
+//  Ola 3 — Operations / Maintenance / Purchases mock state                   //
+// --------------------------------------------------------------------------- //
+interface DeliveryMockSnapshot {
+  deliveries: Array<Record<string, unknown>>;
+  items: Array<Record<string, unknown>>;
+  /** idem key → deliveryId, for idempotent re-submission. */
+  idempotency: Map<string, string>;
+}
+interface MaintenanceMockSnapshot {
+  list: Array<Record<string, unknown>>;
+  updates: Array<Record<string, unknown>>;
+}
+const deliveryMockSnapshots = new Map<string, DeliveryMockSnapshot>();
+const maintenanceMockSnapshots = new Map<string, MaintenanceMockSnapshot>();
+
+interface MockSupplier {
+  id: string;
+  organizationId: string;
+  name: string;
+  contactName?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  rating?: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+interface MockPurchaseRequest {
+  id: string;
+  organizationId: string;
+  siteId?: string;
+  needId?: string;
+  title: string;
+  description?: string;
+  status: string;
+  requesterId?: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+  itemCount: number;
+  quoteCount: number;
+  estimatedTotal: number;
+}
+interface MockPurchaseItem {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  name: string;
+  description?: string;
+  quantity: number;
+  unit: string;
+  estimatedCost?: number;
+  version: number;
+}
+interface MockQuote {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  supplierId: string;
+  price: number;
+  currency: string;
+  qualityScore: number;
+  deliveryDays: number;
+  warrantyMonths: number;
+  technicalFitScore: number;
+  notes?: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN';
+  submittedAt: string;
+  version: number;
+  supplierName?: string;
+}
+interface MockDecision {
+  id: string;
+  organizationId: string;
+  purchaseRequestId: string;
+  decidedBy: string;
+  decidedAt: string;
+  chosenQuoteId: string;
+  justification?: string;
+  weightConfig: Record<string, number>;
+  scores: Array<{
+    quoteId: string;
+    score: number;
+    breakdown: Record<string, { normalized: number; weight: number; contribution: number }>;
+  }>;
+  version: number;
+}
+interface PurchasesMockSnapshot {
+  suppliers: MockSupplier[];
+  requests: MockPurchaseRequest[];
+  items: MockPurchaseItem[];
+  quotes: MockQuote[];
+  decisions: MockDecision[];
+}
+const purchasesMockSnapshots = new Map<string, PurchasesMockSnapshot>();
+
+function ensureDeliveryMock(organizationId: string): DeliveryMockSnapshot {
+  const cached = deliveryMockSnapshots.get(organizationId);
+  if (cached) return cached;
+  const now = new Date().toISOString();
+  const deliveries: DeliveryMockSnapshot['deliveries'] = [
+    {
+      id: 'mock-del-001',
+      organizationId,
+      requestId: 'mock-req-0003',
+      deliveredBy: 'u-operador',
+      deliveredAt: '2026-08-28T08:00:00Z',
+      siteId: 'mock-site-0001',
+      recipientName: 'Ana Suárez',
+      notes: 'Salón listo antes del ensayo.',
+      status: 'COMPLETED',
+      createdAt: '2026-08-28T07:55:00Z',
+      updatedAt: '2026-08-28T11:00:00Z',
+      createdBy: 'u-operador',
+      updatedBy: 'u-operador',
+      version: 2,
+    },
+    {
+      id: 'mock-del-002',
+      organizationId,
+      requestId: 'mock-req-0002',
+      deliveredBy: 'u-operador',
+      deliveredAt: '2026-08-30T10:00:00Z',
+      siteId: 'mock-site-0001',
+      recipientName: 'Luis Pérez',
+      notes: 'Sillas entregadas al salón principal.',
+      status: 'IN_PROGRESS',
+      createdAt: '2026-08-30T09:50:00Z',
+      updatedAt: '2026-08-30T10:00:00Z',
+      createdBy: 'u-operador',
+      updatedBy: 'u-operador',
+      version: 1,
+    },
+    {
+      id: 'mock-del-003',
+      organizationId,
+      requestId: 'mock-req-0006',
+      deliveredBy: 'u-operador',
+      deliveredAt: now,
+      siteId: 'mock-site-0001',
+      recipientName: 'Diego Minetti',
+      notes: 'Notebook entregado con cargador.',
+      status: 'IN_PROGRESS',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: 'u-operador',
+      updatedBy: 'u-operador',
+      version: 1,
+    },
+  ];
+  const idempotency = new Map<string, string>([
+    ['mock-idem-001', 'mock-del-001'],
+    ['mock-idem-002', 'mock-del-002'],
+    ['mock-idem-003', 'mock-del-003'],
+  ]);
+  const items: DeliveryMockSnapshot['items'] = [
+    {
+      id: 'mock-deli-001a',
+      organizationId,
+      deliveryId: 'mock-del-001',
+      resourceId: 'loc-class-101',
+      quantity: 1,
+      returnedAt: '2026-08-28T11:00:00Z',
+      returnedBy: 'u-operador',
+      returnedQuantity: 1,
+      condition: 'OK',
+      version: 2,
+    },
+    {
+      id: 'mock-deli-002a',
+      organizationId,
+      deliveryId: 'mock-del-002',
+      resourceId: 'res-qty-001',
+      quantity: 20,
+      returnedAt: '2026-08-30T22:00:00Z',
+      returnedBy: 'u-operador',
+      returnedQuantity: 20,
+      condition: 'OK',
+      version: 2,
+    },
+    {
+      id: 'mock-deli-002b',
+      organizationId,
+      deliveryId: 'mock-del-002',
+      resourceId: 'res-qty-002',
+      quantity: 4,
+      version: 1,
+    },
+    {
+      id: 'mock-deli-003a',
+      organizationId,
+      deliveryId: 'mock-del-003',
+      resourceId: 'res-serial-001',
+      quantity: 1,
+      version: 1,
+    },
+  ];
+  const snapshot: DeliveryMockSnapshot = { deliveries, items, idempotency };
+  deliveryMockSnapshots.set(organizationId, snapshot);
+  return snapshot;
+}
+
+function mockDeliveryProgress_(items: Array<Record<string, unknown>>) {
+  const total = items.length;
+  const returned = items.filter((it) => it.returnedAt).length;
+  const damage = items.filter((it) => it.condition === 'DAMAGED').length;
+  return {
+    totalItems: total,
+    returnedItems: returned,
+    openItems: total - returned,
+    damageCount: damage,
+  };
+}
+
+function mockRequestHeaderForDelivery_(delivery: Record<string, unknown>) {
+  return {
+    id: String(delivery.requestId),
+    type: 'RESOURCE',
+    requesterName: 'Solicitante',
+    description: 'Detalle de la solicitud',
+    siteId: delivery.siteId ? String(delivery.siteId) : undefined,
+  };
+}
+
+function ensureMaintenanceMock(organizationId: string): MaintenanceMockSnapshot {
+  const cached = maintenanceMockSnapshots.get(organizationId);
+  if (cached) return cached;
+  const list: MaintenanceMockSnapshot['list'] = [
+    {
+      id: 'mock-mnt-001',
+      organizationId,
+      siteId: 'mock-site-0001',
+      resourceId: 'res-broken-001',
+      reportedBy: 'u-operador',
+      reportedAt: '2026-08-22T10:00:00Z',
+      kind: 'CORRECTIVE',
+      severity: 'HIGH',
+      status: 'IN_PROGRESS',
+      description: 'Micrófono sin señal. Diagnóstico inicial: cable interno cortado.',
+      startedAt: '2026-08-23T09:00:00Z',
+      createdAt: '2026-08-22T10:00:00Z',
+      updatedAt: '2026-08-23T09:00:00Z',
+      createdBy: 'u-operador',
+      updatedBy: 'u-tecnico',
+      version: 2,
+    },
+    {
+      id: 'mock-mnt-002',
+      organizationId,
+      siteId: 'mock-site-0001',
+      reportedBy: 'u-pastor',
+      reportedAt: '2026-08-15T14:00:00Z',
+      kind: 'INSPECTION',
+      severity: 'LOW',
+      status: 'RESOLVED',
+      description: 'Inspección trimestral del sistema de sonido.',
+      resolution: 'Limpieza general y reapriete de bornes. Sin novedades.',
+      resolvedAt: '2026-08-16T10:00:00Z',
+      startedAt: '2026-08-15T14:00:00Z',
+      createdAt: '2026-08-15T14:00:00Z',
+      updatedAt: '2026-08-16T10:00:00Z',
+      createdBy: 'u-pastor',
+      updatedBy: 'u-tecnico',
+      version: 3,
+    },
+    {
+      id: 'mock-mnt-003',
+      organizationId,
+      siteId: 'mock-site-0002',
+      reportedBy: 'u-voluntario',
+      reportedAt: '2026-08-10T09:00:00Z',
+      kind: 'PREVENTIVE',
+      severity: 'MEDIUM',
+      status: 'OPEN',
+      description: 'Programar cambio de baterías del sistema de alarmas.',
+      createdAt: '2026-08-10T09:00:00Z',
+      updatedAt: '2026-08-10T09:00:00Z',
+      createdBy: 'u-voluntario',
+      updatedBy: 'u-voluntario',
+      version: 1,
+    },
+    {
+      id: 'mock-mnt-004',
+      organizationId,
+      siteId: 'mock-site-0001',
+      reportedBy: 'u-operador',
+      reportedAt: '2026-07-30T10:00:00Z',
+      kind: 'CORRECTIVE',
+      severity: 'MEDIUM',
+      status: 'CANCELLED',
+      description: 'Aire acondicionado del salón — finalmente resuelto por proveedor externo.',
+      createdAt: '2026-07-30T10:00:00Z',
+      updatedAt: '2026-08-05T12:00:00Z',
+      createdBy: 'u-operador',
+      updatedBy: 'u-operador',
+      version: 2,
+    },
+  ];
+  const updates: MaintenanceMockSnapshot['updates'] = [
+    {
+      id: 'mock-mntu-001a',
+      organizationId,
+      maintenanceId: 'mock-mnt-001',
+      authorId: 'u-operador',
+      at: '2026-08-22T10:00:00Z',
+      kind: 'NOTE',
+      text: 'Reporte creado. Se envía a técnico.',
+      createdAt: '2026-08-22T10:00:00Z',
+      version: 1,
+    },
+    {
+      id: 'mock-mntu-001b',
+      organizationId,
+      maintenanceId: 'mock-mnt-001',
+      authorId: 'u-tecnico',
+      at: '2026-08-23T09:00:00Z',
+      kind: 'STATUS',
+      text: 'Estado: IN_PROGRESS',
+      createdAt: '2026-08-23T09:00:00Z',
+      version: 1,
+    },
+    {
+      id: 'mock-mntu-002a',
+      organizationId,
+      maintenanceId: 'mock-mnt-002',
+      authorId: 'u-pastor',
+      at: '2026-08-15T14:00:00Z',
+      kind: 'NOTE',
+      text: 'Inspección programada.',
+      createdAt: '2026-08-15T14:00:00Z',
+      version: 1,
+    },
+    {
+      id: 'mock-mntu-002b',
+      organizationId,
+      maintenanceId: 'mock-mnt-002',
+      authorId: 'u-tecnico',
+      at: '2026-08-16T10:00:00Z',
+      kind: 'RESOLUTION',
+      text: 'Limpieza general y reapriete de bornes. Sin novedades.',
+      createdAt: '2026-08-16T10:00:00Z',
+      version: 1,
+    },
+  ];
+  const snapshot: MaintenanceMockSnapshot = { list, updates };
+  maintenanceMockSnapshots.set(organizationId, snapshot);
+  return snapshot;
+}
+
+function ensurePurchasesMock(organizationId: string): PurchasesMockSnapshot {
+  const cached = purchasesMockSnapshots.get(organizationId);
+  if (cached) return cached;
+  const now = new Date().toISOString();
+  const suppliers: MockSupplier[] = [
+    {
+      id: 'sup-audio-1',
+      organizationId,
+      name: 'Sonido Profesional SA',
+      contactName: 'Carlos Méndez',
+      email: 'ventas@sonidoprofessional.example',
+      phone: '+54 11 4555-0101',
+      notes: 'Atiende en CABA, entrega en 48h.',
+      rating: 4.6,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    },
+    {
+      id: 'sup-muebles-1',
+      organizationId,
+      name: 'Muebles del Sur',
+      contactName: 'Laura Pérez',
+      email: 'laura@mueblesdelsur.example',
+      phone: '+54 11 4444-2020',
+      notes: 'Cotiza en USD, pedir proforma.',
+      rating: 4.2,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    },
+    {
+      id: 'sup-luces-1',
+      organizationId,
+      name: 'Iluminaciones Norte',
+      contactName: 'Diego Castro',
+      email: 'diego@iluminacionesnorte.example',
+      phone: '+54 11 4777-3030',
+      notes: 'Stock local, mejor precio para volúmenes grandes.',
+      rating: 3.8,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    },
+    {
+      id: 'sup-inactivo-1',
+      organizationId,
+      name: 'Proveedor Viejo',
+      contactName: 'Alguien',
+      email: 'a@b.example',
+      phone: '',
+      notes: 'Dado de baja por incumplimiento.',
+      rating: 2.0,
+      active: false,
+      createdAt: now,
+      updatedAt: now,
+      version: 1,
+    },
+  ];
+
+  const requests: MockPurchaseRequest[] = [
+    {
+      id: 'pr-0001',
+      organizationId,
+      siteId: 'site-centro',
+      needId: 'mock-req-0001',
+      title: 'Cables XLR para consola principal',
+      description: 'Reponer cables quemados en el último servicio.',
+      status: 'COMPLETED',
+      requesterId: 'u-admin',
+      createdAt: '2026-08-10T10:00:00Z',
+      updatedAt: '2026-08-12T10:00:00Z',
+      version: 3,
+      itemCount: 1,
+      quoteCount: 2,
+      estimatedTotal: 60000,
+    },
+    {
+      id: 'pr-0002',
+      organizationId,
+      siteId: 'site-centro',
+      needId: 'mock-req-0005',
+      title: 'Reparación de aire acondicionado salón principal',
+      description: 'El equipo hace ruido y no enfría bien.',
+      status: 'APPROVED',
+      requesterId: 'u-admin',
+      createdAt: '2026-08-22T10:00:00Z',
+      updatedAt: '2026-08-26T15:00:00Z',
+      version: 2,
+      itemCount: 1,
+      quoteCount: 3,
+      estimatedTotal: 180000,
+    },
+    {
+      id: 'pr-0003',
+      organizationId,
+      siteId: 'site-norte',
+      title: 'Sillas plegables adicionales',
+      description: 'Compra de 30 sillas para eventos grandes.',
+      status: 'SUBMITTED',
+      requesterId: 'u-vol-1',
+      createdAt: '2026-08-28T10:00:00Z',
+      updatedAt: '2026-08-28T10:00:00Z',
+      version: 1,
+      itemCount: 1,
+      quoteCount: 2,
+      estimatedTotal: 450000,
+    },
+    {
+      id: 'pr-0004',
+      organizationId,
+      siteId: 'site-centro',
+      title: 'Micrófonos inalámbricos',
+      description: 'Reemplazar los que se romieron.',
+      status: 'CANCELLED',
+      requesterId: 'u-admin',
+      createdAt: '2026-07-30T10:00:00Z',
+      updatedAt: '2026-08-02T10:00:00Z',
+      version: 1,
+      itemCount: 1,
+      quoteCount: 0,
+      estimatedTotal: 0,
+    },
+  ];
+
+  const items: MockPurchaseItem[] = [
+    {
+      id: 'pri-0001',
+      organizationId,
+      purchaseRequestId: 'pr-0001',
+      name: 'Cable XLR 5m',
+      description: 'Cable balanceado para línea de audio.',
+      quantity: 6,
+      unit: 'unidad',
+      estimatedCost: 10000,
+      version: 1,
+    },
+    {
+      id: 'pri-0002',
+      organizationId,
+      purchaseRequestId: 'pr-0002',
+      name: 'Servicio técnico aire acondicionado',
+      description: 'Reparación + carga de gas.',
+      quantity: 1,
+      unit: 'servicio',
+      estimatedCost: 180000,
+      version: 1,
+    },
+    {
+      id: 'pri-0003',
+      organizationId,
+      purchaseRequestId: 'pr-0003',
+      name: 'Silla plegable acero',
+      description: 'Silla reforzada para uso intensivo.',
+      quantity: 30,
+      unit: 'unidad',
+      estimatedCost: 15000,
+      version: 1,
+    },
+    {
+      id: 'pri-0004',
+      organizationId,
+      purchaseRequestId: 'pr-0004',
+      name: 'Micrófono inalámbrico UHF',
+      description: 'Set de 2 micrófonos con receptor.',
+      quantity: 2,
+      unit: 'set',
+      estimatedCost: undefined,
+      version: 1,
+    },
+  ];
+
+  const quotes: MockQuote[] = [
+    {
+      id: 'q-0001-a',
+      organizationId,
+      purchaseRequestId: 'pr-0001',
+      supplierId: 'sup-audio-1',
+      price: 48000,
+      currency: 'ARS',
+      qualityScore: 90,
+      deliveryDays: 3,
+      warrantyMonths: 12,
+      technicalFitScore: 95,
+      notes: 'Stock inmediato.',
+      status: 'ACCEPTED',
+      submittedAt: '2026-08-11T10:00:00Z',
+      version: 2,
+    },
+    {
+      id: 'q-0001-b',
+      organizationId,
+      purchaseRequestId: 'pr-0001',
+      supplierId: 'sup-luces-1',
+      price: 52000,
+      currency: 'ARS',
+      qualityScore: 80,
+      deliveryDays: 7,
+      warrantyMonths: 6,
+      technicalFitScore: 70,
+      notes: 'Buen precio pero demora.',
+      status: 'REJECTED',
+      submittedAt: '2026-08-11T12:00:00Z',
+      version: 2,
+    },
+    {
+      id: 'q-0002-a',
+      organizationId,
+      purchaseRequestId: 'pr-0002',
+      supplierId: 'sup-audio-1',
+      price: 195000,
+      currency: 'ARS',
+      qualityScore: 88,
+      deliveryDays: 2,
+      warrantyMonths: 6,
+      technicalFitScore: 90,
+      notes: 'Visita técnica gratuita.',
+      status: 'ACCEPTED',
+      submittedAt: '2026-08-23T10:00:00Z',
+      version: 2,
+    },
+    {
+      id: 'q-0002-b',
+      organizationId,
+      purchaseRequestId: 'pr-0002',
+      supplierId: 'sup-muebles-1',
+      price: 175000,
+      currency: 'ARS',
+      qualityScore: 75,
+      deliveryDays: 5,
+      warrantyMonths: 3,
+      technicalFitScore: 70,
+      notes: 'No incluye repuestos originales.',
+      status: 'REJECTED',
+      submittedAt: '2026-08-23T14:00:00Z',
+      version: 2,
+    },
+    {
+      id: 'q-0002-c',
+      organizationId,
+      purchaseRequestId: 'pr-0002',
+      supplierId: 'sup-luces-1',
+      price: 220000,
+      currency: 'ARS',
+      qualityScore: 92,
+      deliveryDays: 4,
+      warrantyMonths: 12,
+      technicalFitScore: 85,
+      notes: 'Garantía extendida.',
+      status: 'REJECTED',
+      submittedAt: '2026-08-24T09:00:00Z',
+      version: 2,
+    },
+    {
+      id: 'q-0003-a',
+      organizationId,
+      purchaseRequestId: 'pr-0003',
+      supplierId: 'sup-muebles-1',
+      price: 420000,
+      currency: 'ARS',
+      qualityScore: 85,
+      deliveryDays: 10,
+      warrantyMonths: 6,
+      technicalFitScore: 80,
+      notes: 'Descuento por volumen.',
+      status: 'PENDING',
+      submittedAt: '2026-08-28T18:00:00Z',
+      version: 1,
+    },
+    {
+      id: 'q-0003-b',
+      organizationId,
+      purchaseRequestId: 'pr-0003',
+      supplierId: 'sup-luces-1',
+      price: 450000,
+      currency: 'ARS',
+      qualityScore: 78,
+      deliveryDays: 7,
+      warrantyMonths: 3,
+      technicalFitScore: 75,
+      notes: 'Modelo alternativo más barato.',
+      status: 'PENDING',
+      submittedAt: '2026-08-29T10:00:00Z',
+      version: 1,
+    },
+  ];
+
+  const decisions: MockDecision[] = [
+    {
+      id: 'pd-0001',
+      organizationId,
+      purchaseRequestId: 'pr-0001',
+      decidedBy: 'u-admin',
+      decidedAt: '2026-08-12T10:00:00Z',
+      chosenQuoteId: 'q-0001-a',
+      justification: undefined,
+      weightConfig: {
+        price: 30,
+        quality: 25,
+        delivery: 15,
+        warranty: 10,
+        supplierHistory: 10,
+        technicalFit: 10,
+      },
+      scores: [],
+      version: 1,
+    },
+    {
+      id: 'pd-0002',
+      organizationId,
+      purchaseRequestId: 'pr-0002',
+      decidedBy: 'u-admin',
+      decidedAt: '2026-08-26T15:00:00Z',
+      chosenQuoteId: 'q-0002-a',
+      justification: 'Mejor score general: precio-calidad-garantía equilibrados.',
+      weightConfig: {
+        price: 30,
+        quality: 25,
+        delivery: 15,
+        warranty: 10,
+        supplierHistory: 10,
+        technicalFit: 10,
+      },
+      scores: [],
+      version: 1,
+    },
+  ];
+
+  const snapshot: PurchasesMockSnapshot = {
+    suppliers,
+    requests,
+    items,
+    quotes,
+    decisions,
+  };
+  purchasesMockSnapshots.set(organizationId, snapshot);
+  return snapshot;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+function round4(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function deliveryScore_(days: number): number {
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  if (days <= 3) return 100;
+  if (days >= 60) return 0;
+  return Math.round((1 - (days - 3) / 57) * 100);
+}
+function warrantyScore_(months: number): number {
+  if (!Number.isFinite(months) || months < 0) return 0;
+  if (months >= 24) return 100;
+  if (months === 0) return 30;
+  return Math.round((months / 24) * 100);
+}
+function supplierHistoryScore_(supplier: MockSupplier | { rating?: unknown } | undefined): number {
+  if (!supplier) return 50;
+  const r = Number((supplier as { rating?: unknown }).rating || 0);
+  if (!Number.isFinite(r) || r <= 0) return 50;
+  return Math.max(0, Math.min(100, Math.round((r / 5) * 100)));
+}
+
+function scoreMockQuotes(
+  quotes: Array<{
+    quoteId: string;
+    price: number;
+    quality: number;
+    delivery: number;
+    warranty: number;
+    supplierHistory: number;
+    technicalFit: number;
+  }>,
+  weights: Record<string, number>,
+): Array<{
+  quoteId: string;
+  score: number;
+  breakdown: Record<string, { normalized: number; weight: number; contribution: number }>;
+}> {
+  const keys = ['price', 'quality', 'delivery', 'warranty', 'supplierHistory', 'technicalFit'];
+  const total = keys.reduce((a, k) => a + (Number(weights[k] || 0) || 0), 0);
+  if (total <= 0) throw new Error('Weights must total more than zero');
+  const prices = quotes.map((q) => q.price);
+  if (prices.some((p) => p <= 0)) throw new Error('Prices must be positive');
+  const minPrice = Math.min(...prices);
+  return quotes
+    .map((q) => {
+      const normalized = { ...q, price: (minPrice / q.price) * 100 };
+      const breakdown: Record<
+        string,
+        { normalized: number; weight: number; contribution: number }
+      > = {};
+      let score = 0;
+      for (const key of keys) {
+        const value =
+          key === 'price'
+            ? normalized.price
+            : Math.max(0, Math.min(100, (q as unknown as Record<string, number>)[key]));
+        const contribution = (value * (Number(weights[key] || 0) || 0)) / total;
+        breakdown[key] = {
+          normalized: round4(value),
+          weight: Number(weights[key] || 0),
+          contribution: round4(contribution),
+        };
+        score += contribution;
+      }
+      return { quoteId: q.quoteId, score: round2(score), breakdown };
+    })
+    .sort((a, b) => b.score - a.score);
+}
+
 function mockDispatch<T>(
   action: string,
   organizationId: string,
@@ -1119,6 +1887,679 @@ function mockDispatch<T>(
         (e) => new Date(e.endAt).getTime() >= Date.now(),
       );
       return { ok: true, data: { events } as T };
+    }
+    // ----------------------------------------------------------------------- //
+    //  Ola 3a — Operations / Maintenance (mock data)                          //
+    // ----------------------------------------------------------------------- //
+    case 'operations.listDeliveries': {
+      const snapshot = ensureDeliveryMock(organizationId);
+      return { ok: true, data: { deliveries: snapshot.deliveries.map((d) => ({ ...d })) } as T };
+    }
+    case 'operations.getDelivery': {
+      const id = String((payload as { id?: string }).id || '');
+      const snapshot = ensureDeliveryMock(organizationId);
+      const delivery = snapshot.deliveries.find((d) => d.id === id);
+      if (!delivery) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Entrega no encontrada' } };
+      }
+      const items = snapshot.items.filter((it) => it.deliveryId === id).map((it) => ({ ...it }));
+      const resources = mockResources_(organizationId);
+      const progress = mockDeliveryProgress_(items);
+      const request = mockRequestHeaderForDelivery_(delivery);
+      return {
+        ok: true,
+        data: {
+          delivery: { ...delivery },
+          items,
+          progress,
+          request,
+          resources: resources
+            .filter((r) => items.some((it) => it.resourceId === r.id))
+            .reduce<Record<string, { id: string; name: string; status: string }>>((acc, r) => {
+              acc[r.id] = { id: r.id, name: r.name, status: r.status };
+              return acc;
+            }, {}),
+        } as T,
+      };
+    }
+    case 'operations.deliver': {
+      const body = payload as {
+        idempotencyKey?: string;
+        requestId?: string;
+        expectedVersion?: number;
+        deliveredBy?: string;
+        deliveredAt?: string;
+        siteId?: string;
+        recipientName?: string;
+        notes?: string;
+        items?: Array<{ resourceId: string; quantity: number }>;
+      };
+      if (
+        !body.idempotencyKey ||
+        !body.requestId ||
+        !body.deliveredBy ||
+        !body.recipientName ||
+        !Array.isArray(body.items) ||
+        body.items.length === 0
+      ) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos obligatorios' },
+        };
+      }
+      const snapshot = ensureDeliveryMock(organizationId);
+      const existingId = snapshot.idempotency.get(body.idempotencyKey);
+      if (existingId) {
+        const existing = snapshot.deliveries.find((d) => d.id === existingId);
+        if (existing) {
+          const items = snapshot.items
+            .filter((it) => it.deliveryId === existing.id)
+            .map((it) => ({ ...it }));
+          return {
+            ok: true,
+            data: {
+              delivery: { ...existing },
+              items,
+              resourceIds: items.map((it) => it.resourceId),
+            } as T,
+          };
+        }
+      }
+      const deliveryId = `mock-del-${nextId()}`;
+      const now = body.deliveredAt || new Date().toISOString();
+      const delivery = {
+        id: deliveryId,
+        organizationId,
+        requestId: body.requestId,
+        deliveredBy: body.deliveredBy,
+        deliveredAt: now,
+        siteId: body.siteId,
+        recipientName: body.recipientName,
+        notes: body.notes,
+        status: 'IN_PROGRESS',
+        createdAt: now,
+        updatedAt: now,
+        createdBy: body.deliveredBy,
+        updatedBy: body.deliveredBy,
+        version: 1,
+      };
+      snapshot.idempotency.set(body.idempotencyKey, deliveryId);
+      const items = body.items.map((it) => ({
+        id: `mock-deli-${nextId()}`,
+        organizationId,
+        deliveryId,
+        resourceId: it.resourceId,
+        quantity: it.quantity,
+        version: 1,
+      }));
+      snapshot.deliveries.push(delivery);
+      snapshot.items.push(...items);
+      return {
+        ok: true,
+        data: {
+          delivery: { ...delivery },
+          items: items.map((it) => ({ ...it })),
+          resourceIds: items.map((it) => it.resourceId),
+        } as T,
+      };
+    }
+    case 'operations.returnDeliveryItem': {
+      const body = payload as {
+        deliveryItemId?: string;
+        expectedVersion?: number;
+        condition?: 'OK' | 'DAMAGED' | 'LOST';
+        returnedBy?: string;
+        returnedAt?: string;
+        returnedQuantity?: number;
+        notes?: string;
+      };
+      if (!body.deliveryItemId || !body.condition || !body.returnedBy || !body.expectedVersion) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos obligatorios' },
+        };
+      }
+      const snapshot = ensureDeliveryMock(organizationId);
+      const item = snapshot.items.find((it) => it.id === body.deliveryItemId);
+      if (!item) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Item no encontrado' } };
+      }
+      if (Number(item.version) !== Number(body.expectedVersion)) {
+        return {
+          ok: false,
+          error: {
+            code: 'VERSION_MISMATCH',
+            message: 'El item fue modificado por otro usuario',
+          },
+        };
+      }
+      if (item.returnedAt) {
+        return {
+          ok: false,
+          error: { code: 'ALREADY_RETURNED', message: 'El item ya fue devuelto' },
+        };
+      }
+      const now = body.returnedAt || new Date().toISOString();
+      item.returnedAt = now;
+      item.returnedBy = body.returnedBy;
+      item.returnNotes = body.notes;
+      item.returnedQuantity = body.returnedQuantity ?? item.quantity;
+      item.condition = body.condition;
+      item.version = Number(item.version) + 1;
+      const newStatus =
+        body.condition === 'DAMAGED'
+          ? 'BROKEN'
+          : body.condition === 'LOST'
+            ? 'MISSING'
+            : 'AVAILABLE';
+      const maintenance = ensureMaintenanceMock(organizationId);
+      let maintenanceId: string | undefined;
+      if (body.condition === 'DAMAGED') {
+        const m = {
+          id: `mock-mnt-${nextId()}`,
+          organizationId,
+          siteId: snapshot.deliveries.find((d) => d.id === item.deliveryId)?.siteId,
+          resourceId: item.resourceId,
+          reportedBy: body.returnedBy,
+          reportedAt: now,
+          kind: 'CORRECTIVE' as const,
+          severity: 'MEDIUM' as const,
+          status: 'OPEN' as const,
+          description: body.notes ? `Devuelto con daños: ${body.notes}` : 'Devuelto con daños',
+          sourceDeliveryItemId: item.id,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: body.returnedBy,
+          updatedBy: body.returnedBy,
+          version: 1,
+        };
+        maintenance.list.push(m);
+        maintenance.updates.push({
+          id: `mock-mntu-${nextId()}`,
+          organizationId,
+          maintenanceId: m.id,
+          authorId: body.returnedBy,
+          at: now,
+          kind: 'NOTE',
+          text: 'Generado automáticamente al recibir el item con daños.',
+          createdAt: now,
+          version: 1,
+        });
+        maintenanceId = m.id;
+      }
+      return {
+        ok: true,
+        data: {
+          item: { ...item },
+          resourceId: String(item.resourceId),
+          newStatus,
+          maintenanceId,
+        } as T,
+      };
+    }
+    case 'maintenance.list': {
+      const maintenance = ensureMaintenanceMock(organizationId);
+      return { ok: true, data: { maintenance: maintenance.list.map((row) => ({ ...row })) } as T };
+    }
+    case 'maintenance.get': {
+      const id = String((payload as { id?: string }).id || '');
+      const maintenance = ensureMaintenanceMock(organizationId);
+      const m = maintenance.list.find((row) => row.id === id);
+      if (!m) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Mantenimiento no encontrado' } };
+      }
+      const updates = maintenance.updates
+        .filter((u) => u.maintenanceId === id)
+        .map((u) => ({ ...u }));
+      const resources = mockResources_(organizationId);
+      const resource = m.resourceId ? resources.find((r) => r.id === m.resourceId) : undefined;
+      return {
+        ok: true,
+        data: {
+          maintenance: { ...m },
+          updates,
+          resource: resource
+            ? { id: resource.id, name: resource.name, status: resource.status }
+            : undefined,
+        } as T,
+      };
+    }
+    case 'maintenance.create': {
+      const body = payload as {
+        resourceId?: string;
+        siteId?: string;
+        kind?: 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION';
+        severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+        description?: string;
+        reportedBy?: string;
+        sourceDeliveryItemId?: string;
+      };
+      if (!body.kind || !body.severity || !body.description || !body.reportedBy) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos obligatorios' },
+        };
+      }
+      const maintenance = ensureMaintenanceMock(organizationId);
+      const now = new Date().toISOString();
+      const m = {
+        id: `mock-mnt-${nextId()}`,
+        organizationId,
+        siteId: body.siteId,
+        resourceId: body.resourceId,
+        reportedBy: body.reportedBy,
+        reportedAt: now,
+        kind: body.kind,
+        severity: body.severity,
+        status: 'OPEN' as const,
+        description: body.description,
+        sourceDeliveryItemId: body.sourceDeliveryItemId,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: body.reportedBy,
+        updatedBy: body.reportedBy,
+        version: 1,
+      };
+      maintenance.list.push(m);
+      maintenance.updates.push({
+        id: `mock-mntu-${nextId()}`,
+        organizationId,
+        maintenanceId: m.id,
+        authorId: body.reportedBy,
+        at: now,
+        kind: 'NOTE',
+        text: 'Reporte creado.',
+        createdAt: now,
+        version: 1,
+      });
+      return { ok: true, data: { maintenance: m } as T };
+    }
+    case 'maintenance.update': {
+      const body = payload as {
+        id?: string;
+        expectedVersion?: number;
+        status?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CANCELLED';
+        resolution?: string;
+        cost?: number;
+        note?: string;
+        actorId?: string;
+      };
+      if (!body.id || !body.expectedVersion || !body.actorId) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos obligatorios' },
+        };
+      }
+      const maintenance = ensureMaintenanceMock(organizationId);
+      const m = maintenance.list.find((row) => row.id === body.id);
+      if (!m) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Mantenimiento no encontrado' } };
+      }
+      if (Number(m.version) !== Number(body.expectedVersion)) {
+        return {
+          ok: false,
+          error: {
+            code: 'VERSION_MISMATCH',
+            message: 'El mantenimiento fue modificado por otro usuario',
+          },
+        };
+      }
+      const now = new Date().toISOString();
+      if (body.status) {
+        m.status = body.status;
+        if (body.status === 'IN_PROGRESS' && !m.startedAt) m.startedAt = now;
+        if (body.status === 'RESOLVED') m.resolvedAt = now;
+        maintenance.updates.push({
+          id: `mock-mntu-${nextId()}`,
+          organizationId,
+          maintenanceId: m.id,
+          authorId: body.actorId,
+          at: now,
+          kind: 'STATUS',
+          text: `Estado: ${body.status}`,
+          createdAt: now,
+          version: 1,
+        });
+      }
+      if (body.resolution) {
+        m.resolution = body.resolution;
+        m.status = 'RESOLVED';
+        m.resolvedAt = now;
+        maintenance.updates.push({
+          id: `mock-mntu-${nextId()}`,
+          organizationId,
+          maintenanceId: m.id,
+          authorId: body.actorId,
+          at: now,
+          kind: 'RESOLUTION',
+          text: body.resolution,
+          createdAt: now,
+          version: 1,
+        });
+      }
+      if (typeof body.cost === 'number' && Number.isFinite(body.cost)) {
+        m.cost = body.cost;
+        maintenance.updates.push({
+          id: `mock-mntu-${nextId()}`,
+          organizationId,
+          maintenanceId: m.id,
+          authorId: body.actorId,
+          at: now,
+          kind: 'COST',
+          text: `Costo: ${body.cost}`,
+          createdAt: now,
+          version: 1,
+        });
+      }
+      if (body.note) {
+        maintenance.updates.push({
+          id: `mock-mntu-${nextId()}`,
+          organizationId,
+          maintenanceId: m.id,
+          authorId: body.actorId,
+          at: now,
+          kind: 'NOTE',
+          text: body.note,
+          createdAt: now,
+          version: 1,
+        });
+      }
+      m.updatedAt = now;
+      m.updatedBy = body.actorId;
+      m.version = Number(m.version) + 1;
+      return { ok: true, data: { maintenance: { ...m } } as T };
+    }
+    // ----------------------------------------------------------------------- //
+    //  Ola 3b — Compras / Proveedores (mock data)                             //
+    // ----------------------------------------------------------------------- //
+    case 'purchases.listSuppliers':
+    case 'purchases.upsertSupplier': {
+      const snap = ensurePurchasesMock(organizationId);
+      if (action === 'purchases.listSuppliers') {
+        return { ok: true, data: { suppliers: [...snap.suppliers] } as T };
+      }
+      const body = payload as {
+        id?: string;
+        name?: string;
+        contactName?: string;
+        email?: string;
+        phone?: string;
+        notes?: string;
+        rating?: number;
+        active?: boolean;
+        expectedVersion?: number;
+      };
+      if (!body.name) {
+        return { ok: false, error: { code: 'VALIDATION_ERROR', message: 'name es obligatorio' } };
+      }
+      const now = new Date().toISOString();
+      if (body.id) {
+        const idx = snap.suppliers.findIndex((s) => s.id === body.id);
+        if (idx < 0) {
+          return { ok: false, error: { code: 'NOT_FOUND', message: 'Proveedor' } };
+        }
+        const current = snap.suppliers[idx];
+        if (body.expectedVersion !== undefined && body.expectedVersion !== current.version) {
+          return {
+            ok: false,
+            error: { code: 'VERSION_MISMATCH', message: 'Proveedor modificado' },
+          };
+        }
+        const updated = {
+          ...current,
+          name: body.name,
+          contactName: body.contactName ?? current.contactName,
+          email: body.email ?? current.email,
+          phone: body.phone ?? current.phone,
+          notes: body.notes ?? current.notes,
+          rating: body.rating ?? current.rating,
+          active: body.active === undefined ? current.active : !!body.active,
+          updatedAt: now,
+          version: current.version + 1,
+        };
+        snap.suppliers[idx] = updated;
+        return { ok: true, data: { supplier: updated } as T };
+      }
+      const created = {
+        id: nextId(),
+        organizationId,
+        name: body.name,
+        contactName: body.contactName,
+        email: body.email,
+        phone: body.phone,
+        notes: body.notes,
+        rating: body.rating,
+        active: body.active === undefined ? true : !!body.active,
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+      };
+      snap.suppliers.push(created as MockSupplier);
+      return { ok: true, data: { supplier: created } as T };
+    }
+    case 'purchases.listRequests': {
+      const snap = ensurePurchasesMock(organizationId);
+      const filters = payload as {
+        status?: string;
+        requesterId?: string;
+        since?: string;
+        until?: string;
+      };
+      let rows = [...snap.requests];
+      if (filters.status) rows = rows.filter((r) => r.status === filters.status);
+      if (filters.requesterId) rows = rows.filter((r) => r.requesterId === filters.requesterId);
+      if (filters.since) rows = rows.filter((r) => r.createdAt >= filters.since!);
+      if (filters.until) rows = rows.filter((r) => r.createdAt <= filters.until!);
+      rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+      return { ok: true, data: { requests: rows.map((r) => ({ ...r })) } as T };
+    }
+    case 'purchases.getRequest': {
+      const id = String((payload as { id?: string }).id || '');
+      const snap = ensurePurchasesMock(organizationId);
+      const req = snap.requests.find((r) => r.id === id);
+      if (!req) return { ok: false, error: { code: 'NOT_FOUND', message: 'Solicitud de compra' } };
+      const items = snap.items.filter((i) => i.purchaseRequestId === id);
+      const quotes = snap.quotes
+        .filter((q) => q.purchaseRequestId === id)
+        .map((q) => ({
+          ...q,
+          supplierName: snap.suppliers.find((s) => s.id === q.supplierId)?.name ?? '',
+        }));
+      const decision = snap.decisions.find((d) => d.purchaseRequestId === id);
+      return { ok: true, data: { request: { ...req }, items, quotes, decision } as T };
+    }
+    case 'purchases.createRequest': {
+      const body = payload as {
+        title?: string;
+        description?: string;
+        siteId?: string;
+        needId?: string;
+        requesterId?: string;
+        items?: {
+          name?: string;
+          description?: string;
+          quantity?: number;
+          unit?: string;
+          estimatedCost?: number;
+        }[];
+      };
+      if (!body.title || !body.items?.length) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos' },
+        };
+      }
+      const snap = ensurePurchasesMock(organizationId);
+      const now = new Date().toISOString();
+      const id = nextId();
+      const record = {
+        id,
+        organizationId,
+        siteId: body.siteId,
+        needId: body.needId,
+        title: body.title,
+        description: body.description,
+        status: 'SUBMITTED',
+        requesterId: body.requesterId || 'u-admin',
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
+        itemCount: body.items.length,
+        quoteCount: 0,
+        estimatedTotal: body.items.reduce(
+          (acc, it) => acc + (Number(it.estimatedCost) || 0) * (Number(it.quantity) || 0),
+          0,
+        ),
+      };
+      snap.requests.push(record as MockPurchaseRequest);
+      const items = body.items.map((it) => ({
+        id: nextId(),
+        organizationId,
+        purchaseRequestId: id,
+        name: it.name ?? '',
+        description: it.description,
+        quantity: Number(it.quantity) || 0,
+        unit: it.unit ?? 'unidad',
+        estimatedCost: it.estimatedCost,
+        version: 1,
+      }));
+      snap.items.push(...(items as MockPurchaseItem[]));
+      return { ok: true, data: { request: { ...record }, items } as T };
+    }
+    case 'purchases.listQuotes': {
+      const requestId = String((payload as { purchaseRequestId?: string }).purchaseRequestId || '');
+      const snap = ensurePurchasesMock(organizationId);
+      const quotes = snap.quotes
+        .filter((q) => q.purchaseRequestId === requestId)
+        .map((q) => ({
+          ...q,
+          supplierName: snap.suppliers.find((s) => s.id === q.supplierId)?.name ?? '',
+        }));
+      return { ok: true, data: { quotes } as T };
+    }
+    case 'purchases.addQuote': {
+      const body = payload as {
+        purchaseRequestId?: string;
+        supplierId?: string;
+        price?: number;
+        currency?: string;
+        qualityScore?: number;
+        deliveryDays?: number;
+        warrantyMonths?: number;
+        technicalFitScore?: number;
+        notes?: string;
+      };
+      if (!body.purchaseRequestId || !body.supplierId || !(body.price && body.price > 0)) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos o precio inválido' },
+        };
+      }
+      const snap = ensurePurchasesMock(organizationId);
+      const supplier = snap.suppliers.find((s) => s.id === body.supplierId);
+      if (!supplier) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Proveedor' } };
+      }
+      const now = new Date().toISOString();
+      const quote = {
+        id: nextId(),
+        organizationId,
+        purchaseRequestId: body.purchaseRequestId,
+        supplierId: body.supplierId,
+        price: Number(body.price),
+        currency: body.currency || 'ARS',
+        qualityScore: Number(body.qualityScore || 0),
+        deliveryDays: Number(body.deliveryDays || 0),
+        warrantyMonths: Number(body.warrantyMonths || 0),
+        technicalFitScore: Number(body.technicalFitScore || 0),
+        notes: body.notes,
+        status: 'PENDING' as const,
+        submittedAt: now,
+        version: 1,
+        supplierName: supplier.name,
+      };
+      snap.quotes.push(quote as MockQuote);
+      // Bump the request's quoteCount.
+      const req = snap.requests.find((r) => r.id === body.purchaseRequestId);
+      if (req) {
+        req.quoteCount = (req.quoteCount ?? 0) + 1;
+        req.version = (req.version ?? 1) + 1;
+        req.updatedAt = now;
+      }
+      return { ok: true, data: { quote } as T };
+    }
+    case 'purchases.decide': {
+      const body = payload as {
+        purchaseRequestId?: string;
+        chosenQuoteId?: string;
+        weights?: Record<string, number>;
+        justification?: string;
+      };
+      if (!body.purchaseRequestId || !body.chosenQuoteId || !body.weights) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Faltan campos' },
+        };
+      }
+      const snap = ensurePurchasesMock(organizationId);
+      const request = snap.requests.find((r) => r.id === body.purchaseRequestId);
+      if (!request) {
+        return { ok: false, error: { code: 'NOT_FOUND', message: 'Solicitud' } };
+      }
+      const quotes = snap.quotes.filter((q) => q.purchaseRequestId === body.purchaseRequestId);
+      if (!quotes.length) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Sin cotizaciones' },
+        };
+      }
+      const assessment = quotes.map((q) => {
+        const supplier = snap.suppliers.find((s) => s.id === q.supplierId);
+        return {
+          quoteId: q.id,
+          price: q.price,
+          quality: q.qualityScore,
+          delivery: deliveryScore_(q.deliveryDays),
+          warranty: warrantyScore_(q.warrantyMonths),
+          supplierHistory: supplierHistoryScore_(supplier),
+          technicalFit: q.technicalFitScore,
+        };
+      });
+      const scores = scoreMockQuotes(assessment, body.weights as Record<string, number>);
+      const justification = body.justification ?? '';
+      if (scores[0] && scores[0].quoteId !== body.chosenQuoteId && !justification.trim()) {
+        return {
+          ok: false,
+          error: { code: 'VALIDATION_ERROR', message: 'Justificación obligatoria' },
+        };
+      }
+      const now = new Date().toISOString();
+      const decisionId = nextId();
+      const decision = {
+        id: decisionId,
+        organizationId,
+        purchaseRequestId: body.purchaseRequestId,
+        decidedBy: 'u-admin',
+        decidedAt: now,
+        chosenQuoteId: body.chosenQuoteId,
+        justification,
+        weightConfig: body.weights,
+        scores,
+        version: 1,
+      };
+      snap.decisions.push(decision as MockDecision);
+      request.status = 'APPROVED';
+      request.version = (request.version ?? 1) + 1;
+      request.updatedAt = now;
+      quotes.forEach((q) => {
+        q.status = q.id === body.chosenQuoteId ? 'ACCEPTED' : 'REJECTED';
+        q.version = (q.version ?? 1) + 1;
+        q.submittedAt = q.submittedAt ?? now;
+      });
+      return {
+        ok: true,
+        data: { decision, scores, weights: body.weights } as T,
+      };
     }
     default:
       return { ok: false, error: { code: 'UNKNOWN_ACTION', message: `Mock no soporta ${action}` } };
