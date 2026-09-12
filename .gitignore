@@ -41,3 +41,4 @@ pnpm-debug.log*
 # Env overrides
 .npmrc.local
 .yarnrc.local
+.worktrees/
