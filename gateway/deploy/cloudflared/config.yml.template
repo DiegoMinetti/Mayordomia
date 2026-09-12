@@ -1,0 +1,27 @@
+# Template — copialo a /mayordomia/cloudflared/config.yml en la Pi
+# y editá los placeholders ${TUNNEL_ID}, ${TUNNEL_NAME}, ${HOSTNAME}.
+
+tunnel: ${TUNNEL_NAME}
+credentials-file: /etc/cloudflared/${TUNNEL_ID}.json
+
+# Logs estructurados para journald.
+logfile: /dev/stdout
+loglevel: info
+
+# Métricas locales opcionales (Prometheus). Comentá si no las usás.
+metrics: localhost:2000
+
+ingress:
+  # ─── regla NUEVA para Mayordomía ─────────────────────────────────
+  - hostname: ${HOSTNAME}
+    service: http://mayordomia-web:80
+    originRequest:
+      connectTimeout: 10s
+      noHappyEyeballs: true
+  # ─── reglas existentes de otros proyectos (no tocar) ──────────────
+  # - hostname: otro.fewlines.com.ar
+  #   service: http://otro-web:80
+  # - hostname: *.fewlines.net.ar
+  #   service: http://...
+  # ─── catch-all obligatorio al final ──────────────────────────────
+  - service: http_status:404

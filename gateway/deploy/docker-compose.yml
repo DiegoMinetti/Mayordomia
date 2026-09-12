@@ -7,21 +7,24 @@
 #     ├── secrets/
 #     │   └── sa-key.json       <- Service Account key (chmod 600)
 #     ├── dist/                 <- build del frontend Vite
-#     └── web/
-#         └── nginx.conf        <- reverse proxy local para /api
+#     ├── web/
+#     │   └── nginx.conf        <- reverse proxy local para /api
+#     └── cloudflared/
+#         ├── config.yml        <- tunnel config (ver ./cloudflared/config.yml.template)
+#         └── <TUNNEL_ID>.json  <- tunnel credentials (chmod 600)
 #
 # Levanta: docker compose up -d --build
-# Logs:    docker compose logs -f api
+# Logs:    docker compose logs -f api / cloudflared
 # Stop:    docker compose down
 #
 # IMPORTANTE: las networks usan aliases explícitos (mayordomia-web,
-# mayordomia-api) para evitar el gotcha de DNS collision con otros
-# proyectos Docker de la Pi (MisNumeros, StatusCluster, etc.).
+# mayordomia-api, mayordomia-tunnel) para evitar el gotcha de DNS collision
+# con otros proyectos Docker de la Pi (MisNumeros, StatusCluster, etc).
 
 services:
   api:
     build:
-      context: ../gateway    # o la ruta donde clonaste el repo en la Pi
+      context: ../gateway
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -61,3 +64,18 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      default:
+        aliases:
+          - mayordomia-tunnel
+    depends_on:
+      - web
+    # Sin healthcheck: cloudflared se autorevisa y reporta a la UI de CF.
+    # Logs: docker compose logs -f tunnel
