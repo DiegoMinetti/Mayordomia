@@ -6,8 +6,8 @@ FROM nginx:alpine
 
 # dist/ is produced by `npm run build` in the same workflow before this build.
 # The build context must be the repo root so this relative path resolves.
-COPY dist/ /usr/share/nginx/html/:ro
-COPY web-image/nginx.conf /etc/nginx/conf.d/default.conf:ro
+COPY dist/ /usr/share/nginx/html/
+COPY web-image/nginx.conf /etc/nginx/conf.d/default.conf
 
 # The web container only listens on the internal Docker network; no port
 # needs to be published on the host because the cloudflared container
