@@ -13,9 +13,10 @@ concurrency:
   cancel-in-progress: true
 env:
   REGISTRY: ghcr.io
-  # ghcr.io tag rules require lowercase; ${{ github.repository_owner }} may
-  # contain capitals (e.g. DiegoMinetti), so we lowercase it explicitly.
-  IMAGE_OWNER: ${{ lower(github.repository_owner) }}
+  # ghcr.io tag rules require lowercase. Hardcode the lowercase owner to
+  # avoid relying on GitHub's expression functions, which have changed
+  # behaviour across runner versions.
+  IMAGE_OWNER: diegominetti
 jobs:
   build:
     runs-on: ubuntu-latest
