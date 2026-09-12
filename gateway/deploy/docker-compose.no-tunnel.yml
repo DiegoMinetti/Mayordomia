@@ -37,7 +37,8 @@ services:
         aliases:
           - mayordomia-api
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000/ping"]
+      # node:20-bookworm-slim has no wget/curl, so use the bundled node.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/ping', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
