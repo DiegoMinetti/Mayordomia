@@ -28,11 +28,9 @@ async function main(): Promise<void> {
     process.on('SIGINT', shutdown);
   } catch (error) {
     if (error instanceof ApiException) {
-      // eslint-disable-next-line no-console
       console.error(JSON.stringify({ code: error.code, message: error.message, status: error.status }));
       process.exit(error.status >= 500 ? 1 : 2);
     }
-    // eslint-disable-next-line no-console
     console.error(error);
     process.exit(1);
   }

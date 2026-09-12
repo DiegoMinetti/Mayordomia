@@ -77,7 +77,8 @@ export function buildApp(deps: ServerDeps): Express {
   });
 
   // Centralized error → envelope mapping.
-  app.use((err: { requestId?: string; error?: unknown } & Error, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: { requestId?: string; error?: unknown } & Error, _req: Request, res: Response, _next: NextFunction): void => {
+    void _next; // Express requires the 4-arg signature for error middleware
     const requestId = err.requestId ?? randomUUID();
     const inner = (err as { error?: unknown }).error ?? err;
     if (inner instanceof ApiException) {

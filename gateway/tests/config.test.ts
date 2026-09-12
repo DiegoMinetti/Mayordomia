@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { loadConfig } from '../src/config.js';
-import { ApiException } from '../src/errors.js';
 
 describe('config', () => {
   it('requires SPREADSHEET_ID', () => {

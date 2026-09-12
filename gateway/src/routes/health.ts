@@ -8,7 +8,6 @@
 import type { SheetsClient } from '../sheets/client.js';
 import type { Config } from '../config.js';
 import type { DispatchContext } from '../router/index.js';
-import { ApiError } from '../errors.js';
 
 export const VERSION = '0.1.0';
 export const SCHEMA_VERSION = 1;
