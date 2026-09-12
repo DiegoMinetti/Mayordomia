@@ -1,7 +1,10 @@
 # Multi-stage build for Mayordomía gateway.
 # Targets ARM64 (Raspberry Pi 4/5) and AMD64 (dev/CI).
 # Builder stage: compile TypeScript.
-FROM node:20-alpine AS builder
+# Uses bookworm-slim (glibc) instead of alpine (musl): cross-arch builds via
+# QEMU user-mode emulation crash on Node 20 alpine arm64 with
+# 'Illegal instruction' — glibc sidesteps the V8 SIMD paths that break.
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
@@ -10,7 +13,7 @@ COPY src ./src
 RUN npm run build
 
 # Runtime stage: minimal image with prod deps only.
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package.json package-lock.json* ./
