@@ -1,0 +1,81 @@
+# docker-compose.yml para la Raspberry Pi.
+#
+# Estructura esperada en /mayordomia/ en la Pi:
+#   /mayordomia/
+#     ├── docker-compose.yml    <- este archivo
+#     ├── .env                  <- variables de entorno (chmod 600)
+#     ├── secrets/
+#     │   └── sa-key.json       <- Service Account key (chmod 600)
+#     ├── dist/                 <- build del frontend Vite
+#     ├── web/
+#     │   └── nginx.conf        <- reverse proxy local para /api
+#     └── cloudflared/
+#         ├── config.yml        <- tunnel config (ver ./cloudflared/config.yml.template)
+#         └── <TUNNEL_ID>.json  <- tunnel credentials (chmod 600)
+#
+# Levanta: docker compose up -d --build
+# Logs:    docker compose logs -f api / cloudflared
+# Stop:    docker compose down
+#
+# IMPORTANTE: las networks usan aliases explícitos (mayordomia-web,
+# mayordomia-api, mayordomia-tunnel) para evitar el gotcha de DNS collision
+# con otros proyectos Docker de la Pi (MisNumeros, StatusCluster, etc).
+
+services:
+  api:
+    build:
+      context: ../gateway
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      GOOGLE_SERVICE_ACCOUNT_FILE: /run/secrets/sa-key.json
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      CALENDAR_ID: ${CALENDAR_ID:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      PUBLIC_TOKEN_PEPPER: ${PUBLIC_TOKEN_PEPPER:-}
+    volumes:
+      - ./secrets/sa-key.json:/run/secrets/sa-key.json:ro
+    networks:
+      default:
+        aliases:
+          - mayordomia-api
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      default:
+        aliases:
+          - mayordomia-web
+    depends_on:
+      api:
+        condition: service_healthy
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    networks:
+      default:
+        aliases:
+          - mayordomia-tunnel
+    depends_on:
+      - web
+    # Sin healthcheck: cloudflared se autorevisa y reporta a la UI de CF.
+    # Logs: docker compose logs -f tunnel

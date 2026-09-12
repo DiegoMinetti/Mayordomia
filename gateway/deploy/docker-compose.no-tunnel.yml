@@ -1,0 +1,61 @@
+# docker-compose.yml para la Raspberry Pi — sin tunnel, imágenes desde GHCR.
+#
+# Las imágenes se publican en GitHub Container Registry por el workflow
+# `.github/workflows/deploy.yml` en cada push a main. La Pi las baja con
+# `docker compose pull` antes de levantar.
+#
+# Para usar imágenes locales durante desarrollo, cambiá `image:` por
+# `build:` con el contexto correspondiente.
+#
+# Estructura esperada en /mayordomia/ en la Pi:
+#   /mayordomia/
+#     ├── docker-compose.yml       <- este archivo
+#     ├── .env                     (chmod 600)
+#     ├── secrets/sa-key.json      (chmod 600)
+#     └── cloudflared/             (opcional, si decidís correr tunnel desde acá)
+
+services:
+  api:
+    image: ghcr.io/diegominetti/mayordomia-api:latest
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      SPREADSHEET_ID: ${SPREADSHEET_ID}
+      GOOGLE_SERVICE_ACCOUNT_FILE: /run/secrets/sa-key.json
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      CALENDAR_ID: ${CALENDAR_ID:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+      PUBLIC_TOKEN_PEPPER: ${PUBLIC_TOKEN_PEPPER:-}
+    volumes:
+      - ./secrets/sa-key.json:/run/secrets/sa-key.json:ro
+    networks:
+      cloudflare-network:
+        aliases:
+          - mayordomia-api
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:3000/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: ghcr.io/diegominetti/mayordomia-web:latest
+    pull_policy: always
+    restart: unless-stopped
+    networks:
+      cloudflare-network:
+        aliases:
+          - mayordomia-web
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  cloudflare-network:
+    external: true
+    name: cloudflare-network
