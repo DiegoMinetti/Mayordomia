@@ -67,14 +67,15 @@ const gatewayDeps = {
 
 function InnerProviders({ children }: { children: React.ReactNode }) {
   const { organizationId, ready } = useCurrentOrg();
-  if (!ready || !organizationId) {
-    // While discovery is loading or the user has no org yet, render the app
-    // without a DataProvider. Modules that need data will show their own
-    // empty state.
-    return <>{children}</>;
-  }
+  // Always wrap with a DataProvider, even before org discovery settles or
+  // when the user has no org yet. Components like <NotificationBell> that
+  // live in <AppShell> hook into the DataContext on every render and
+  // crash the whole tree if the provider is absent. Clients in mock mode
+  // return empty/loading states without a real org, so this is safe.
+  // We pass an empty string when no org is bound; hooks gate their
+  // requests on `!!organizationId`, so nothing fires.
   return (
-    <DataProvider deps={gatewayDeps} organizationId={organizationId}>
+    <DataProvider deps={gatewayDeps} organizationId={ready && organizationId ? organizationId : ''}>
       {children}
     </DataProvider>
   );

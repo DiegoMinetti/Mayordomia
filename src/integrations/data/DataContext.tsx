@@ -23,20 +23,23 @@ export { DataContext };
 export interface DataProviderProps {
   /** Per-organization data clients. The provider creates them lazily from deps + org. */
   deps: GatewayClientDeps;
-  organizationId: string;
+  /** Optional. When absent, the provider renders children without a real org
+   *  bound — clients will still work in mock mode but throw on real calls. */
+  organizationId?: string;
   children: ReactNode;
 }
 
 export function DataProvider({ deps, organizationId, children }: DataProviderProps) {
   const clients = useMemo<DataClients>(() => {
     const gw = new GatewayClient(deps);
+    const orgId = organizationId ?? '';
     return {
-      catalog: new DataClient(gw, { organizationId }),
-      requests: new RequestsDataClient(gw, { organizationId }),
-      operations: new OperationsDataClient(gw, { organizationId }),
-      maintenance: new MaintenanceDataClient(gw, { organizationId }),
-      purchases: new PurchasesDataClient(gw, { organizationId }),
-      notifications: new NotificationsDataClient(gw, { organizationId }),
+      catalog: new DataClient(gw, { organizationId: orgId }),
+      requests: new RequestsDataClient(gw, { organizationId: orgId }),
+      operations: new OperationsDataClient(gw, { organizationId: orgId }),
+      maintenance: new MaintenanceDataClient(gw, { organizationId: orgId }),
+      purchases: new PurchasesDataClient(gw, { organizationId: orgId }),
+      notifications: new NotificationsDataClient(gw, { organizationId: orgId }),
     };
   }, [deps, organizationId]);
   return <DataContext.Provider value={clients}>{children}</DataContext.Provider>;
