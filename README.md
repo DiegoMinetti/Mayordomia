@@ -31,6 +31,7 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run test:e2e   # Playwright: arranca `npm run dev` y ejercita flujos públicos
 ```
 
 Nunca agregar secretos a `.env.local`: toda variable `VITE_*` termina visible en el navegador. Allí sólo van identificadores y URLs públicos.

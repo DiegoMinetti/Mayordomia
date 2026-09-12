@@ -6,19 +6,22 @@ import {
   ExpandMore,
   Handyman,
   Inventory2,
+  Login as LoginIcon,
+  Logout as LogoutIcon,
   Menu,
   MoreHoriz,
-  Notifications,
   Place,
   RequestPage,
   ShoppingCart,
 } from '@mui/icons-material';
 import {
   AppBar,
-  Badge,
+  Avatar,
   Box,
   BottomNavigation,
   BottomNavigationAction,
+  Button,
+  Chip,
   Drawer,
   IconButton,
   List,
@@ -29,11 +32,15 @@ import {
   Select,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../integrations/auth';
+import { useCurrentOrg } from '../integrations/org';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 
 const nav = [
   { to: '/', label: 'Inicio', icon: Dashboard },
@@ -52,6 +59,8 @@ export function AppShell() {
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const navigate = useNavigate();
+  const { isAuthenticated, isLoading, user, signIn, signOut, error } = useAuth();
+  const { organizationId, setOrganizationId, available: availableOrgs } = useCurrentOrg();
   const drawer = (
     <Box>
       <Toolbar>
@@ -105,19 +114,64 @@ export function AppShell() {
           </IconButton>
           <Select
             size="small"
-            value="central"
+            value={organizationId ?? ''}
             IconComponent={ExpandMore}
+            onChange={(e) => setOrganizationId(String(e.target.value))}
             sx={{ minWidth: 180, ml: 1 }}
             aria-label="Organización"
+            disabled={!isAuthenticated || availableOrgs.length === 0}
+            displayEmpty
           >
-            <MenuItem value="central">Congregación Central</MenuItem>
+            {availableOrgs.length === 0 ? (
+              <MenuItem value="" disabled>
+                {isAuthenticated ? 'Sin organizaciones' : 'Iniciá sesión'}
+              </MenuItem>
+            ) : (
+              availableOrgs.map((org) => (
+                <MenuItem key={org.organizationId} value={org.organizationId}>
+                  {org.name}
+                </MenuItem>
+              ))
+            )}
           </Select>
           <Box flex={1} />
-          <IconButton aria-label="3 notificaciones">
-            <Badge badgeContent={3} color="error">
-              <Notifications />
-            </Badge>
-          </IconButton>
+          {isAuthenticated && user ? (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mr: 1 }}>
+              <Chip
+                avatar={<Avatar src={user.picture} alt={user.name ?? user.email} />}
+                label={user.name ?? user.email}
+                variant="outlined"
+                size="small"
+              />
+              <Tooltip title="Cerrar sesión">
+                <IconButton onClick={() => void signOut()} aria-label="Cerrar sesión">
+                  <LogoutIcon />
+                </IconButton>
+              </Tooltip>
+            </Stack>
+          ) : (
+            <Tooltip
+              title={
+                error?.code === 'NOT_CONFIGURED'
+                  ? 'Configurá VITE_GOOGLE_CLIENT_ID para habilitar el login'
+                  : 'Iniciar sesión con Google'
+              }
+            >
+              <span>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<LoginIcon />}
+                  onClick={() => void signIn()}
+                  disabled={isLoading || error?.code === 'NOT_CONFIGURED'}
+                  sx={{ mr: 1 }}
+                >
+                  Iniciar sesión
+                </Button>
+              </span>
+            </Tooltip>
+          )}
+          <NotificationBell />
         </Toolbar>
       </AppBar>
       <Box component="nav">

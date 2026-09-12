@@ -31,6 +31,8 @@ Respuesta estable: `{"ok":true,"data":{},"error":null,"meta":{"requestId":"..."}
 Rutas:
 
 - `requests.createPublic`: anónima; token opaco, honeypot `website`, validación, 100 KB máximo, sanitización y límite de 20/10 min por token.
+- `requests.list` / `requests.get`: `request.review`; listado con filtros (`status`, `type`, `siteId`, `since`, `until`) y detalle con aprobaciones + timeline.
+- `requests.approve` / `requests.reject`: `request.approve.area` o `request.approve.general` según `scope`; concurrencia optimista vía `expectedVersion` (`VERSION_MISMATCH` si choca).
 - `system.health`: `config.manage`.
 - `system.migrate`: `config.manage`, backup previo y auditoría.
 - `emails.enqueue` / `emails.process`: `notification.manage`.
