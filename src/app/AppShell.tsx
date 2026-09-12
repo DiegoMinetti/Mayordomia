@@ -189,7 +189,12 @@ export function AppShell() {
         id="main"
         sx={{
           flex: 1,
-          width: { md: `calc(100% - ${drawerWidth}px)` },
+          // The permanent drawer is position:fixed (out of normal flow),
+          // so on desktop we have to push the main column past it via
+          // margin-left; using only `width: calc(100% - drawerWidth)` made
+          // the content render under the drawer.
+          ml: { md: `${drawerWidth}px` },
+          width: '100%',
           p: { xs: 2, sm: 3 },
           mt: 8,
           mb: { xs: 8, md: 0 },
