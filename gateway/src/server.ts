@@ -16,6 +16,8 @@ import { ok, fail } from './envelope.js';
 import { ApiException } from './errors.js';
 import { makeCatalogHandlers } from './routes/catalog.js';
 import { makeHealthHandlers } from './routes/health.js';
+import { makeRequestsHandlers } from './requests/handlers.js';
+import { makePublicRequestsHandlers, makeRateLimiter } from './requests/public.js';
 
 export interface ServerDeps {
   config: Config;
@@ -53,6 +55,14 @@ export function buildApp(deps: ServerDeps): Express {
   // Register all routes that exist in this build.
   const catalog = makeCatalogHandlers({ sheets });
   const health = makeHealthHandlers({ sheets, config });
+  const requests = makeRequestsHandlers({ sheets, audit });
+  const rateLimit = makeRateLimiter(config.rateLimit);
+  const publicRequests = makePublicRequestsHandlers({
+    sheets,
+    audit,
+    publicTokenPepper: config.publicTokenPepper ?? '',
+    rateLimit,
+  });
   const dispatchDeps: DispatchDeps = { sheets, audit };
 
   register('system.health', { auth: true, permission: 'config.manage' }, (payload, ctx) =>
@@ -63,6 +73,13 @@ export function buildApp(deps: ServerDeps): Express {
   register('catalog.listSites', { auth: true }, (payload, ctx) => catalog.listSites(payload, ctx));
   register('catalog.listUsers', { auth: true }, (payload, ctx) => catalog.listUsers(payload, ctx));
   register('catalog.listRoles', { auth: true }, (payload, ctx) => catalog.listRoles(payload, ctx));
+
+  // PR 2 — Requests module.
+  register('requests.list', { auth: true, permission: 'request.review' }, (payload, ctx) => requests.list(payload, ctx));
+  register('requests.get', { auth: true, permission: 'request.review' }, (payload, ctx) => requests.get(payload, ctx));
+  register('requests.approve', { auth: true, audit: true }, (payload, ctx) => requests.approve(payload, ctx));
+  register('requests.reject', { auth: true, audit: true }, (payload, ctx) => requests.reject(payload, ctx));
+  register('requests.createPublic', {}, (payload, ctx) => publicRequests.create(payload, ctx));
 
   // Single action endpoint. Mirrors Apps Script doPost() contract.
   app.post('/api', async (req: Request, res: Response, next: NextFunction) => {

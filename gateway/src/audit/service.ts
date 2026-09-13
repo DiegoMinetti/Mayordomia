@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 export interface AuditEntry {
   organizationId?: string;
   actorId?: string;
-  actorType?: 'USER' | 'SYSTEM';
+  actorType?: 'USER' | 'SYSTEM' | 'PUBLIC';
   action: string;
   entityType?: string;
   entityId?: string;
