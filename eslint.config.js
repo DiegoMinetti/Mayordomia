@@ -9,5 +9,10 @@ export default tseslint.config(
   // Frontend (React/Vite)
   { extends: [js.configs.recommended, ...tseslint.configs.recommended], files: ['src/**/*.{ts,tsx}'], languageOptions: { ecmaVersion: 2022, globals: globals.browser }, plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh }, rules: { ...reactHooks.configs.recommended.rules, 'react-refresh/only-export-components': ['warn', { allowConstantExport: true }] } },
   // Gateway (Node/Express)
-  { extends: [js.configs.recommended, ...tseslint.configs.recommended], files: ['gateway/src/**/*.ts', 'gateway/tests/**/*.ts'], languageOptions: { ecmaVersion: 2022, globals: { ...globals.node } } },
+  { extends: [js.configs.recommended, ...tseslint.configs.recommended], files: ['gateway/src/**/*.ts', 'gateway/tests/**/*.ts'], languageOptions: { ecmaVersion: 2022, globals: { ...globals.node } }, rules: {
+    // @typescript-eslint/no-unused-expressions has a known incompatibility
+    // with eslint 8.57's flat-config wrapper (TypeError reading
+    // 'allowShortCircuit'). tsc already flags unused expressions.
+    '@typescript-eslint/no-unused-expressions': 'off',
+  } },
 );
