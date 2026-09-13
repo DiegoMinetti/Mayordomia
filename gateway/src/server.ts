@@ -57,12 +57,6 @@ export function buildApp(deps: ServerDeps): Express {
   const health = makeHealthHandlers({ sheets, config });
   const requests = makeRequestsHandlers({ sheets, audit });
   const rateLimit = makeRateLimiter(config.rateLimit);
-  const publicRequests = makePublicRequestsHandlers({
-    sheets,
-    audit,
-    publicTokenPepper: config.publicTokenPepper ?? '',
-    rateLimit,
-  });
   const dispatchDeps: DispatchDeps = { sheets, audit };
 
   register('system.health', { auth: true, permission: 'config.manage' }, (payload, ctx) =>
@@ -79,7 +73,20 @@ export function buildApp(deps: ServerDeps): Express {
   register('requests.get', { auth: true, permission: 'request.review' }, (payload, ctx) => requests.get(payload, ctx));
   register('requests.approve', { auth: true, audit: true }, (payload, ctx) => requests.approve(payload, ctx));
   register('requests.reject', { auth: true, audit: true }, (payload, ctx) => requests.reject(payload, ctx));
-  register('requests.createPublic', {}, (payload, ctx) => publicRequests.create(payload, ctx));
+
+  // requests.createPublic needs PUBLIC_TOKEN_PEPPER; skip the route when absent.
+  if (config.publicTokenPepper) {
+    const publicRequests = makePublicRequestsHandlers({
+      sheets,
+      audit,
+      publicTokenPepper: config.publicTokenPepper,
+      rateLimit,
+    });
+    register('requests.createPublic', {}, (payload, ctx) => publicRequests.create(payload, ctx));
+    logger.info('registered requests.createPublic (pepper configured)');
+  } else {
+    logger.warn('PUBLIC_TOKEN_PEPPER not set — requests.createPublic route disabled');
+  }
 
   // Single action endpoint. Mirrors Apps Script doPost() contract.
   app.post('/api', async (req: Request, res: Response, next: NextFunction) => {
