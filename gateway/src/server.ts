@@ -20,6 +20,10 @@ import { makeRequestsHandlers } from './requests/handlers.js';
 import { makePublicRequestsHandlers, makeRateLimiter } from './requests/public.js';
 import { makeResourcesHandlers } from './resources/handlers.js';
 import { makeEventsHandlers } from './events/handlers.js';
+import { makeOperationsHandlers } from './operations/handlers.js';
+import { makeMaintenanceHandlers } from './maintenance/handlers.js';
+import { makePurchasesHandlers } from './purchases/handlers.js';
+import { makeNotificationsHandlers } from './notifications/handlers.js';
 
 export interface ServerDeps {
   config: Config;
@@ -60,6 +64,10 @@ export function buildApp(deps: ServerDeps): Express {
   const requests = makeRequestsHandlers({ sheets, audit });
   const resources = makeResourcesHandlers({ sheets });
   const events = makeEventsHandlers({ sheets });
+  const operations = makeOperationsHandlers({ sheets });
+  const maintenance = makeMaintenanceHandlers({ sheets });
+  const purchases = makePurchasesHandlers({ sheets });
+  const notifications = makeNotificationsHandlers({ sheets });
   const rateLimit = makeRateLimiter(config.rateLimit);
   const dispatchDeps: DispatchDeps = { sheets, audit };
 
@@ -82,6 +90,18 @@ export function buildApp(deps: ServerDeps): Express {
   register('events.list', { auth: true, permission: 'event.review' }, (payload, ctx) => events.list(payload, ctx));
   register('events.get', { auth: true, permission: 'event.review' }, (payload, ctx) => events.get(payload, ctx));
   register('events.upcoming', { auth: true, permission: 'event.review' }, (payload, ctx) => events.upcoming(payload, ctx));
+
+  // PR 4 — Operations, Maintenance, Purchases, Notifications (read-only).
+  register('operations.list', { auth: true, permission: 'delivery.manage' }, (p, ctx) => operations.list(p, ctx));
+  register('operations.get', { auth: true, permission: 'delivery.manage' }, (p, ctx) => operations.get(p, ctx));
+  register('maintenance.list', { auth: true, permission: 'maintenance.manage' }, (p, ctx) => maintenance.list(p, ctx));
+  register('maintenance.get', { auth: true, permission: 'maintenance.manage' }, (p, ctx) => maintenance.get(p, ctx));
+  register('purchases.listSuppliers', { auth: true, permission: 'purchase.manage' }, (p, ctx) => purchases.listSuppliers(p, ctx));
+  register('purchases.listRequests', { auth: true, permission: 'purchase.manage' }, (p, ctx) => purchases.listRequests(p, ctx));
+  register('purchases.getRequest', { auth: true, permission: 'purchase.manage' }, (p, ctx) => purchases.getRequest(p, ctx));
+  register('purchases.listQuotes', { auth: true, permission: 'purchase.manage' }, (p, ctx) => purchases.listQuotes(p, ctx));
+  register('notifications.listMine', { auth: true }, (p, ctx) => notifications.listMine(p, ctx));
+  register('notifications.unreadCount', { auth: true }, (p, ctx) => notifications.unreadCount(p, ctx));
 
   // PR 2 — Requests module.
   register('requests.list', { auth: true, permission: 'request.review' }, (payload, ctx) => requests.list(payload, ctx));
