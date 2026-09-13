@@ -18,7 +18,10 @@ export interface SheetsClient {
   /** Read all rows of a sheet (header row consumed, returns Record<string, unknown>[]). */
   rows: (sheet: string) => Promise<Record<string, unknown>[]>;
   /** Find the first row matching the predicate. */
-  findOne: (sheet: string, predicate: (row: Record<string, unknown>) => boolean) => Promise<Record<string, unknown> | null>;
+  findOne: (
+    sheet: string,
+    predicate: (row: Record<string, unknown>) => boolean,
+  ) => Promise<Record<string, unknown> | null>;
   /** Append a record (header-aware: writes only known columns). */
   append: (sheet: string, record: Record<string, unknown>) => Promise<void>;
   /** Update a row by matching column. Returns true if a row was updated. */
@@ -33,6 +36,17 @@ export interface SheetsClient {
 }
 
 export async function createSheetsClient(config: Config, logger: Logger): Promise<SheetsClient> {
+  // SPREADSHEET_ID is required during the Sheets→SQLite migration window
+  // (verified in createServer() before calling this). PR 2 removes this
+  // dependency entirely.
+  if (!config.spreadsheetId) {
+    throw ApiError.internal(
+      'CONFIG_MISSING',
+      'SPREADSHEET_ID is required to initialize the Sheets client.',
+    );
+  }
+  const ssId: string = config.spreadsheetId;
+
   let auth: object;
   if (config.googleServiceAccountFile) {
     if (!existsSync(config.googleServiceAccountFile)) {
@@ -62,14 +76,18 @@ export async function createSheetsClient(config: Config, logger: Logger): Promis
 
   const raw = google.sheets({
     version: 'v4',
-    auth: auth as unknown as Parameters<typeof google.sheets>[0] extends infer O ? O extends { auth?: infer A } ? A : never : never,
+    auth: auth as unknown as Parameters<typeof google.sheets>[0] extends infer O
+      ? O extends { auth?: infer A }
+        ? A
+        : never
+      : never,
   });
 
   const cache = new Map<string, string[]>();
 
   async function readSheet(sheet: string): Promise<Record<string, unknown>[]> {
     const res = await raw.spreadsheets.values.get({
-      spreadsheetId: config.spreadsheetId,
+      spreadsheetId: ssId,
       range: `${sheet}!A1:ZZ`,
     });
     const values = res.data.values ?? [];
@@ -105,15 +123,17 @@ export async function createSheetsClient(config: Config, logger: Logger): Promis
     let headers = cache.get(sheet);
     if (!headers) {
       const meta = await raw.spreadsheets.values.get({
-        spreadsheetId: config.spreadsheetId,
+        spreadsheetId: ssId,
         range: `${sheet}!A1:1`,
       });
       headers = (meta.data.values?.[0] ?? []).map(String);
       cache.set(sheet, headers);
     }
-    const row = headers.map((h) => (record[h] === undefined || record[h] === null ? '' : String(record[h])));
+    const row = headers.map((h) =>
+      record[h] === undefined || record[h] === null ? '' : String(record[h]),
+    );
     await raw.spreadsheets.values.append({
-      spreadsheetId: config.spreadsheetId,
+      spreadsheetId: ssId,
       range: `${sheet}!A1`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
@@ -140,7 +160,7 @@ export async function createSheetsClient(config: Config, logger: Logger): Promis
       return String(list[rowIndex]?.[h] ?? '');
     });
     await raw.spreadsheets.values.update({
-      spreadsheetId: config.spreadsheetId,
+      spreadsheetId: ssId,
       range: `${sheet}!A${startRow}:${String.fromCharCode(64 + headers.length)}${startRow}`,
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: [row] },
@@ -153,5 +173,5 @@ export async function createSheetsClient(config: Config, logger: Logger): Promis
     // Method kept so call sites can be future-proof.
   }
 
-  return { raw, spreadsheetId: config.spreadsheetId, rows, findOne, append, updateWhere, close };
+  return { raw, spreadsheetId: ssId, rows, findOne, append, updateWhere, close };
 }

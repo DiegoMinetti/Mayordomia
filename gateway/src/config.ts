@@ -10,14 +10,6 @@
 import 'dotenv/config';
 import { ApiError } from './errors.js';
 
-function required(name: string, env: NodeJS.ProcessEnv): string {
-  const value = env[name];
-  if (!value || value.trim() === '') {
-    throw ApiError.internal('CONFIG_MISSING', `Falta configuración server-side: ${name}`);
-  }
-  return value;
-}
-
 function optional(name: string, env: NodeJS.ProcessEnv): string | undefined {
   const value = env[name];
   return value && value.trim() !== '' ? value : undefined;
@@ -37,8 +29,13 @@ export interface Config {
   nodeEnv: 'development' | 'production' | 'test';
   logLevel: string;
   allowedOrigins: string[];
-  spreadsheetId: string;
+  /** Path to the SQLite database file. `:memory:` allowed for tests. */
+  dbPath: string;
+  /** @deprecated kept during the Sheets→SQLite migration (PR 2); will be removed. */
+  spreadsheetId: string | undefined;
+  /** @deprecated kept during the Sheets→SQLite migration (PR 2); will be removed. */
   googleServiceAccountFile: string | undefined;
+  /** @deprecated kept during the Sheets→SQLite migration (PR 2); will be removed. */
   googleServiceAccountJson: string | undefined;
   calendarId: string | undefined;
   resendApiKey: string | undefined;
@@ -59,12 +56,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw ApiError.internal('CONFIG_MISSING', `PORT inválido: ${portRaw}`);
   }
 
+  const nodeEnv = parseNodeEnv(env['NODE_ENV']);
+  const dbPathRaw = env['DB_PATH'];
+  const dbPath =
+    dbPathRaw && dbPathRaw.trim() !== ''
+      ? dbPathRaw
+      : nodeEnv === 'test'
+        ? ':memory:'
+        : `./data/mayordomia-${nodeEnv}.db`;
+
   return {
     port,
     nodeEnv: parseNodeEnv(env['NODE_ENV']),
     logLevel: env['LOG_LEVEL'] ?? 'info',
     allowedOrigins: list('ALLOWED_ORIGINS', env),
-    spreadsheetId: required('SPREADSHEET_ID', env),
+    dbPath,
+    spreadsheetId: optional('SPREADSHEET_ID', env),
     googleServiceAccountFile: optional('GOOGLE_SERVICE_ACCOUNT_FILE', env),
     googleServiceAccountJson: optional('GOOGLE_SERVICE_ACCOUNT_JSON', env),
     calendarId: optional('CALENDAR_ID', env),
