@@ -18,6 +18,8 @@ import { makeCatalogHandlers } from './routes/catalog.js';
 import { makeHealthHandlers } from './routes/health.js';
 import { makeRequestsHandlers } from './requests/handlers.js';
 import { makePublicRequestsHandlers, makeRateLimiter } from './requests/public.js';
+import { makeResourcesHandlers } from './resources/handlers.js';
+import { makeEventsHandlers } from './events/handlers.js';
 
 export interface ServerDeps {
   config: Config;
@@ -56,6 +58,8 @@ export function buildApp(deps: ServerDeps): Express {
   const catalog = makeCatalogHandlers({ sheets });
   const health = makeHealthHandlers({ sheets, config });
   const requests = makeRequestsHandlers({ sheets, audit });
+  const resources = makeResourcesHandlers({ sheets });
+  const events = makeEventsHandlers({ sheets });
   const rateLimit = makeRateLimiter(config.rateLimit);
   const dispatchDeps: DispatchDeps = { sheets, audit };
 
@@ -67,6 +71,17 @@ export function buildApp(deps: ServerDeps): Express {
   register('catalog.listSites', { auth: true }, (payload, ctx) => catalog.listSites(payload, ctx));
   register('catalog.listUsers', { auth: true }, (payload, ctx) => catalog.listUsers(payload, ctx));
   register('catalog.listRoles', { auth: true }, (payload, ctx) => catalog.listRoles(payload, ctx));
+
+  // PR 3 — Resources (read-only).
+  register('resources.list', { auth: true, permission: 'resource.review' }, (payload, ctx) => resources.list(payload, ctx));
+  register('resources.get', { auth: true, permission: 'resource.review' }, (payload, ctx) => resources.get(payload, ctx));
+  register('resources.listLocations', { auth: true, permission: 'resource.review' }, (payload, ctx) => resources.listLocations(payload, ctx));
+  register('resources.getLocation', { auth: true, permission: 'resource.review' }, (payload, ctx) => resources.getLocation(payload, ctx));
+
+  // PR 3 — Events (read-only).
+  register('events.list', { auth: true, permission: 'event.review' }, (payload, ctx) => events.list(payload, ctx));
+  register('events.get', { auth: true, permission: 'event.review' }, (payload, ctx) => events.get(payload, ctx));
+  register('events.upcoming', { auth: true, permission: 'event.review' }, (payload, ctx) => events.upcoming(payload, ctx));
 
   // PR 2 — Requests module.
   register('requests.list', { auth: true, permission: 'request.review' }, (payload, ctx) => requests.list(payload, ctx));
