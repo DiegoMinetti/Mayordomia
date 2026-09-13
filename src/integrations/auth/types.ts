@@ -34,6 +34,7 @@ export type AuthError =
   | { code: 'ACCESS_DENIED'; message: string }
   | { code: 'NETWORK'; message: string }
   | { code: 'EXPIRED'; message: string }
+  | { code: 'ORG_NOT_FOUND'; message: string }
   | { code: 'UNKNOWN'; message: string };
 
 export type AuthState =

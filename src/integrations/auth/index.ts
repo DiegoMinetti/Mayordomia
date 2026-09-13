@@ -1,5 +1,5 @@
 export { AuthContext, AuthContextProvider } from './AuthContext';
-export { LocalAuthProvider } from './LocalAuthProvider';
+export { LocalAuthProvider, ApiCallError } from './LocalAuthProvider';
 export type { LocalAuthProviderOptions } from './LocalAuthProvider';
 export { MockAuthProvider } from './MockAuthProvider';
 export type { MockAuthProviderOptions } from './MockAuthProvider';

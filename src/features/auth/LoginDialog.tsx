@@ -19,7 +19,7 @@ import {
   Tab,
 } from '@mui/material';
 import { startAuthentication as startPasskey } from '@simplewebauthn/browser';
-import { useAuth } from '../../integrations/auth';
+import { ApiCallError, useAuth } from '../../integrations/auth';
 
 interface LoginDialogProps {
   open: boolean;
@@ -43,11 +43,17 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
   const [error, setError] = useState<string | null>(null);
   const [magicSent, setMagicSent] = useState(false);
   const [devLink, setDevLink] = useState<string | null>(null);
+  // When register fails with ORG_NOT_FOUND we offer an in-dialog bootstrap that
+  // calls /api/auth/setup with the same email/password/orgId so the user doesn't
+  // have to leave the UI and curl by hand.
+  const [bootstrapPrompt, setBootstrapPrompt] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setSubmitting(true);
     setError(null);
+    setBootstrapPrompt(false);
     try {
       if (authMode === 'password') {
         if (passwordMode === 'login') {
@@ -89,9 +95,44 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
         }
       }
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message;
+      setError(message);
+      if (err instanceof ApiCallError && err.code === 'ORG_NOT_FOUND') {
+        setBootstrapPrompt(true);
+      }
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleBootstrap(): Promise<void> {
+    setBootstrapping(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/auth/setup', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          name: name || email.split('@')[0],
+          organizationId,
+        }),
+      });
+      const body = (await res.json()) as {
+        ok: boolean;
+        data?: { token?: string };
+        error?: { message: string };
+      };
+      if (!body.ok) throw new Error(body.error?.message ?? 'setup failed');
+      // /auth/setup already set the cookie. Reload so the rest of the app picks
+      // up the new session via /auth/me.
+      window.location.reload();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBootstrapping(false);
     }
   }
 
@@ -107,6 +148,7 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
           setError(null);
           setMagicSent(false);
           setDevLink(null);
+          setBootstrapPrompt(false);
         }}
         sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
       >
@@ -201,11 +243,26 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
                     : 'Crear cuenta'
                   : 'Enviar enlace'}
           </Button>
+          {bootstrapPrompt && (
+            <Button
+              type="button"
+              variant="outlined"
+              color="primary"
+              onClick={() => void handleBootstrap()}
+              disabled={loading || bootstrapping}
+            >
+              {bootstrapping ? 'Creando congregación…' : 'Crear congregación y cuenta'}
+            </Button>
+          )}
           {authMode === 'password' && (
             <Button
               type="button"
               size="small"
-              onClick={() => setPasswordMode(passwordMode === 'login' ? 'register' : 'login')}
+              onClick={() => {
+                setPasswordMode(passwordMode === 'login' ? 'register' : 'login');
+                setError(null);
+                setBootstrapPrompt(false);
+              }}
               disabled={loading}
             >
               {passwordMode === 'login' ? 'Crear cuenta nueva' : 'Ya tengo cuenta'}

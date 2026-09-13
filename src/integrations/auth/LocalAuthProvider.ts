@@ -62,7 +62,7 @@ export class LocalAuthProvider implements AuthProvider {
   async signIn(args: { email: string; password: string; organizationId: string }): Promise<void> {
     this.setState({ status: 'loading' });
     try {
-      const res = await this.post('/auth/login', args);
+      const res = await this.post('/api/auth/login', args);
       const body = (await res.json()) as ApiEnvelope<{
         token: string;
         expiresAt: string;
@@ -70,7 +70,10 @@ export class LocalAuthProvider implements AuthProvider {
       }>;
       if (!body.ok || !body.data) {
         this.setState({ status: 'unauthenticated', error: toAuthError(body.error) });
-        throw new Error(body.error?.message ?? 'login failed');
+        throw new ApiCallError(
+          body.error?.code ?? 'UNKNOWN',
+          body.error?.message ?? 'login failed',
+        );
       }
       const session = toAuthSession(body.data);
       this.persist(session);
@@ -90,7 +93,7 @@ export class LocalAuthProvider implements AuthProvider {
   }): Promise<void> {
     this.setState({ status: 'loading' });
     try {
-      const res = await this.post('/auth/register', args);
+      const res = await this.post('/api/auth/register', args);
       const body = (await res.json()) as ApiEnvelope<{
         token: string;
         expiresAt: string;
@@ -98,7 +101,10 @@ export class LocalAuthProvider implements AuthProvider {
       }>;
       if (!body.ok || !body.data) {
         this.setState({ status: 'unauthenticated', error: toAuthError(body.error) });
-        throw new Error(body.error?.message ?? 'register failed');
+        throw new ApiCallError(
+          body.error?.code ?? 'UNKNOWN',
+          body.error?.message ?? 'register failed',
+        );
       }
       const session = toAuthSession(body.data);
       this.persist(session);
@@ -116,7 +122,7 @@ export class LocalAuthProvider implements AuthProvider {
 
   async signOut(): Promise<void> {
     try {
-      await this.post('/auth/logout', {});
+      await this.post('/api/auth/logout', {});
     } catch {
       // Best-effort — clear local state regardless.
     }
@@ -140,7 +146,7 @@ export class LocalAuthProvider implements AuthProvider {
     if (cached) {
       // Best-effort: ask /auth/me to validate.
       try {
-        const res = await this.fetchImpl(`${this.baseUrl}/auth/me`, {
+        const res = await this.fetchImpl(`${this.baseUrl}/api/auth/me`, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cached}` },
@@ -203,6 +209,21 @@ export class LocalAuthProvider implements AuthProvider {
 
 // ---- helpers --------------------------------------------------------------
 
+/**
+ * Error thrown by signIn/signUp when the gateway rejects the call. Carries the
+ * raw `code` (e.g. `ORG_NOT_FOUND`, `USER_EXISTS`) so the UI can branch on it
+ * — `Error.message` alone isn't enough to drive contextual CTAs like a
+ * "bootstrap this org" button on `ORG_NOT_FOUND`.
+ */
+export class ApiCallError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'ApiCallError';
+    this.code = code;
+  }
+}
+
 interface ApiUser {
   id: string;
   organizationId: string;
@@ -236,6 +257,7 @@ function toAuthSession(input: { token: string; expiresAt: string; user: ApiUser 
 function toAuthError(api: { code: string; message: string } | null): AuthError {
   if (!api) return { code: 'UNKNOWN', message: 'Error desconocido' };
   if (api.code === 'UNAUTHORIZED') return { code: 'ACCESS_DENIED', message: api.message };
+  if (api.code === 'ORG_NOT_FOUND') return { code: 'ORG_NOT_FOUND', message: api.message };
   if (api.code === 'USER_EXISTS') return { code: 'UNKNOWN', message: api.message };
   if (api.code === 'VALIDATION_ERROR') return { code: 'UNKNOWN', message: api.message };
   return { code: 'UNKNOWN', message: api.message };
