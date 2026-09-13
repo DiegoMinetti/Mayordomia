@@ -85,9 +85,6 @@ export interface PublicRequestsDeps {
 }
 
 export function makePublicRequestsHandlers(deps: PublicRequestsDeps) {
-  if (!deps.publicTokenPepper) {
-    throw new Error('PUBLIC_TOKEN_PEPPER is required for public request creation');
-  }
   async function create(payload: Record<string, unknown>, ctx: DispatchContext) {
     const data = parsePublicPayload(payload);
     if (data.website) throw ApiError.badRequest('SPAM_DETECTED', 'Solicitud inválida');
