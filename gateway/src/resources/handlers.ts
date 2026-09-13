@@ -11,7 +11,7 @@
  */
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 import {
   RESOURCE_KINDS,
@@ -22,18 +22,18 @@ import {
 } from './types.js';
 
 export interface ResourcesHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
-async function listResources(sheets: SheetsClient, organizationId: string): Promise<ResourceRow[]> {
-  const rows = await sheets.rows('Resources');
+async function listResources(repo: Repository, organizationId: string): Promise<ResourceRow[]> {
+  const rows = await repo.rows('Resources');
   return rows
     .filter((r) => String(r['organizationId']) === organizationId)
     .map((r) => r as unknown as ResourceRow);
 }
 
-async function listLocations(sheets: SheetsClient, organizationId: string): Promise<LocationRow[]> {
-  const rows = await sheets.rows('Locations');
+async function listLocations(repo: Repository, organizationId: string): Promise<LocationRow[]> {
+  const rows = await repo.rows('Locations');
   return rows
     .filter((r) => String(r['organizationId']) === organizationId)
     .map((r) => r as unknown as LocationRow);
@@ -80,7 +80,7 @@ export function makeResourcesHandlers(deps: ResourcesHandlersDeps) {
       kind: payload['kind'] ? enumValue(payload['kind'], 'kind', RESOURCE_KINDS) : null,
       status: payload['status'] ? enumValue(payload['status'], 'status', RESOURCE_STATUSES) : null,
     };
-    let rows = await listResources(deps.sheets, orgId);
+    let rows = await listResources(deps.repo, orgId);
     if (filters.siteId) rows = rows.filter((r) => r.siteId === filters.siteId);
     if (filters.areaId) rows = rows.filter((r) => r.areaId === filters.areaId);
     if (filters.kind) rows = rows.filter((r) => r.kind === filters.kind);
@@ -93,7 +93,7 @@ export function makeResourcesHandlers(deps: ResourcesHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Resources', (r) => {
+    const row = await deps.repo.findOne('Resources', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Recurso');
@@ -108,7 +108,7 @@ export function makeResourcesHandlers(deps: ResourcesHandlersDeps) {
       kind: payload['kind'] ? enumValue(payload['kind'], 'kind', LOCATION_KINDS) : null,
       parentId: payload['parentId'] ? validateId(payload['parentId'], 'parentId') : null,
     };
-    let rows = await listLocations(deps.sheets, orgId);
+    let rows = await listLocations(deps.repo, orgId);
     if (filters.siteId) rows = rows.filter((r) => r.siteId === filters.siteId);
     if (filters.kind) rows = rows.filter((r) => r.kind === filters.kind);
     if (filters.parentId) rows = rows.filter((r) => r.parentId === filters.parentId);
@@ -120,7 +120,7 @@ export function makeResourcesHandlers(deps: ResourcesHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Locations', (r) => {
+    const row = await deps.repo.findOne('Locations', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Espacio');

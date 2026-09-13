@@ -14,7 +14,7 @@ import { object, string } from '../validation.js';
 import * as AuthService from '../auth/service.js';
 import type { AuthContext, Identity } from '../auth/service.js';
 import type { AuditService } from '../audit/service.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 
 export type Handler<Output = unknown> = (
   payload: Record<string, unknown>,
@@ -36,7 +36,7 @@ export interface DispatchContext {
 }
 
 export interface DispatchDeps {
-  sheets: SheetsClient;
+  repo: Repository;
   audit: AuditService;
 }
 
@@ -78,7 +78,7 @@ export async function dispatch(req: IncomingRequest, deps: DispatchDeps): Promis
     if (!/^[A-Za-z0-9_-]{6,128}$/.test(orgId)) {
       throw ApiError.badRequest('VALIDATION_ERROR', 'organizationId inválido');
     }
-    ctx.auth = await AuthService.context(deps.sheets, orgId, req.auth ?? {});
+    ctx.auth = await AuthService.context(deps.repo, orgId, req.auth ?? {});
     if (route.options.permission) AuthService.requirePermission(ctx.auth, route.options.permission);
   } else if (route.options.identity) {
     ctx.identity = await AuthService.verifyIdentity(req.auth ?? {});

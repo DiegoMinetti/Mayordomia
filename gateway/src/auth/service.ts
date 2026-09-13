@@ -8,7 +8,7 @@
  */
 import { google } from 'googleapis';
 import { ApiError } from '../errors.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 
 export interface Identity {
   email: string;
@@ -23,7 +23,15 @@ export interface AuthContext {
   permissions: string[];
 }
 
-async function fetchProfile(accessToken: string): Promise<{ email: string; email_verified?: string; name?: string; picture?: string; sub?: string }> {
+async function fetchProfile(
+  accessToken: string,
+): Promise<{
+  email: string;
+  email_verified?: string;
+  name?: string;
+  picture?: string;
+  sub?: string;
+}> {
   const oauth2 = google.oauth2({ version: 'v2', auth: accessToken });
   const res = await oauth2.userinfo.get();
   return res.data as { email: string; name?: string; picture?: string; sub?: string };
@@ -46,7 +54,9 @@ export async function verifyGoogleToken(accessToken: string | undefined): Promis
   }
 }
 
-export async function verifyIdentity(auth: { accessToken?: string } | undefined): Promise<Identity> {
+export async function verifyIdentity(
+  auth: { accessToken?: string } | undefined,
+): Promise<Identity> {
   const accessToken = auth?.accessToken;
   const email = await verifyGoogleToken(accessToken);
   let profile: { name?: string; picture?: string; sub?: string } = {};
@@ -64,23 +74,29 @@ export async function verifyIdentity(auth: { accessToken?: string } | undefined)
 }
 
 export async function context(
-  sheets: SheetsClient,
+  repo: Repository,
   organizationId: string,
   auth: { accessToken?: string } | undefined,
 ): Promise<AuthContext> {
   const email = await verifyGoogleToken(auth?.accessToken);
-  const user = await sheets.findOne('Users', (r) => {
-    return String(r['organizationId']) === organizationId &&
+  const user = await repo.findOne('Users', (r) => {
+    return (
+      String(r['organizationId']) === organizationId &&
       String(r['email']).toLowerCase() === email &&
-      r['status'] === 'ACTIVE';
+      r['status'] === 'ACTIVE'
+    );
   });
   if (!user) throw ApiError.forbidden('organization.member');
-  const assignments = (await sheets.rows('UserRoles')).filter(
-    (r) => String(r['organizationId']) === organizationId && String(r['userId']) === String(user['id']),
+  const assignments = (await repo.rows('UserRoles')).filter(
+    (r) =>
+      String(r['organizationId']) === organizationId && String(r['userId']) === String(user['id']),
   );
   const roleIds = assignments.map((r) => String(r['roleId']));
-  const permissions = (await sheets.rows('RolePermissions'))
-    .filter((r) => String(r['organizationId']) === organizationId && roleIds.includes(String(r['roleId'])))
+  const permissions = (await repo.rows('RolePermissions'))
+    .filter(
+      (r) =>
+        String(r['organizationId']) === organizationId && roleIds.includes(String(r['roleId'])),
+    )
     .map((r) => String(r['permission']));
   return { user, organizationId, permissions };
 }

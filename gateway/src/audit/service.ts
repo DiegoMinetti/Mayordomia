@@ -3,7 +3,7 @@
  * Failures are logged but never throw (audit must not break user requests).
  */
 import type { Logger } from '../logging.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import { randomUUID } from 'node:crypto';
 
 export interface AuditEntry {
@@ -17,11 +17,11 @@ export interface AuditEntry {
   metadata?: Record<string, unknown>;
 }
 
-export function makeAuditService(sheets: SheetsClient, logger: Logger) {
+export function makeAuditService(repo: Repository, logger: Logger) {
   return {
     async record(entry: AuditEntry): Promise<void> {
       try {
-        await sheets.append('AuditLog', {
+        await repo.append('AuditLog', {
           id: randomUUID(),
           organizationId: entry.organizationId ?? '',
           actorId: entry.actorId ?? '',

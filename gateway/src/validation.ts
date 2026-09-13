@@ -26,9 +26,11 @@ export function string(value: unknown, label: string, opts: StringOpts = {}): st
     throw ApiError.badRequest('VALIDATION_ERROR', `${label} es obligatorio`);
   }
   const max = opts.max ?? 500;
-  if (clean.length > max) throw ApiError.badRequest('VALIDATION_ERROR', `${label} excede el máximo`);
+  if (clean.length > max)
+    throw ApiError.badRequest('VALIDATION_ERROR', `${label} excede el máximo`);
   const min = opts.min ?? 0;
-  if (clean.length < min) throw ApiError.badRequest('VALIDATION_ERROR', `${label} es demasiado corto`);
+  if (clean.length < min)
+    throw ApiError.badRequest('VALIDATION_ERROR', `${label} es demasiado corto`);
   return clean;
 }
 
@@ -44,7 +46,11 @@ export function email(value: unknown, label: string): string {
   return clean;
 }
 
-export function enumValue<T extends string>(value: unknown, label: string, allowed: readonly T[]): T {
+export function enumValue<T extends string>(
+  value: unknown,
+  label: string,
+  allowed: readonly T[],
+): T {
   if (typeof value !== 'string' || !(allowed as readonly string[]).includes(value)) {
     throw ApiError.badRequest('VALIDATION_ERROR', `${label} inválido`);
   }

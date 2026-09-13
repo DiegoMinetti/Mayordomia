@@ -4,13 +4,13 @@
  */
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 
 const DELIVERY_STATUSES = ['DRAFT', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
 
 export interface OperationsHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
 function toDelivery(r: Record<string, unknown>) {
@@ -51,10 +51,14 @@ export function makeOperationsHandlers(deps: OperationsHandlersDeps) {
       requestId: payload['requestId'] ? validateId(payload['requestId'], 'requestId') : null,
       status: payload['status'] ? enumValue(payload['status'], 'status', DELIVERY_STATUSES) : null,
     };
-    let rows = (await deps.sheets.rows('Deliveries')).filter((r) => String(r['organizationId']) === orgId);
+    let rows = (await deps.repo.rows('Deliveries')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     if (filters.requestId) rows = rows.filter((r) => String(r['requestId']) === filters.requestId);
     if (filters.status) rows = rows.filter((r) => String(r['status']) === filters.status);
-    rows.sort((a, b) => String(b['deliveredAt'] ?? '').localeCompare(String(a['deliveredAt'] ?? '')));
+    rows.sort((a, b) =>
+      String(b['deliveredAt'] ?? '').localeCompare(String(a['deliveredAt'] ?? '')),
+    );
     return { deliveries: rows.map(toDelivery) };
   }
 
@@ -62,11 +66,11 @@ export function makeOperationsHandlers(deps: OperationsHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Deliveries', (r) => {
+    const row = await deps.repo.findOne('Deliveries', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Entrega');
-    const items = (await deps.sheets.rows('DeliveryItems'))
+    const items = (await deps.repo.rows('DeliveryItems'))
       .filter((r) => String(r['organizationId']) === orgId && String(r['deliveryId']) === id)
       .map(toDeliveryItem);
     const open = items.filter((i) => !i.returnedAt).length;

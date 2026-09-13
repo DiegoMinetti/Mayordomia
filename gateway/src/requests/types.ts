@@ -42,7 +42,4 @@ export const ROLLUP_PENDING = 'PENDING' as const;
 export const ROLLUP_APPROVED = 'APPROVED' as const;
 export const ROLLUP_REJECTED = 'REJECTED' as const;
 export type ApprovalRollup =
-  | typeof ROLLUP_NONE
-  | typeof ROLLUP_PENDING
-  | typeof ROLLUP_APPROVED
-  | typeof ROLLUP_REJECTED;
+  typeof ROLLUP_NONE | typeof ROLLUP_PENDING | typeof ROLLUP_APPROVED | typeof ROLLUP_REJECTED;

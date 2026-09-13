@@ -3,11 +3,11 @@
  * Mutations (markRead, markAllRead, publish) come in PR 5.
  */
 import { object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 
 export interface NotificationsHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
 function isTruthy(v: unknown): boolean {
@@ -43,7 +43,9 @@ export function makeNotificationsHandlers(deps: NotificationsHandlersDeps) {
     object(_payload, 'payload');
     const userId = String(ctx.auth!.user['id']);
     const orgId = ctx.auth!.organizationId;
-    let rows = (await deps.sheets.rows('Notifications')).filter((r) => String(r['organizationId']) === orgId);
+    let rows = (await deps.repo.rows('Notifications')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     rows = rows.filter((r) => isOrgWide(r) || String(r['userId']) === userId);
     rows.sort((a, b) => String(b['createdAt']).localeCompare(String(a['createdAt'])));
     const limit = Math.min(rows.length, 50);
@@ -54,7 +56,7 @@ export function makeNotificationsHandlers(deps: NotificationsHandlersDeps) {
     object(_payload, 'payload');
     const userId = String(ctx.auth!.user['id']);
     const orgId = ctx.auth!.organizationId;
-    const rows = (await deps.sheets.rows('Notifications'))
+    const rows = (await deps.repo.rows('Notifications'))
       .filter((r) => String(r['organizationId']) === orgId)
       .filter((r) => isOrgWide(r) || String(r['userId']) === userId)
       .filter((r) => !isTruthy(r['read']));

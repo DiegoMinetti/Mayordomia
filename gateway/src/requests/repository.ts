@@ -4,7 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { ApiError } from '../errors.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { ApprovalScope, ApprovalStatus } from './types.js';
 
 export interface RequestRow {
@@ -47,32 +47,32 @@ export interface ApprovalRow {
 }
 
 export async function findRequest(
-  sheets: SheetsClient,
+  repo: Repository,
   id: string,
   organizationId: string,
 ): Promise<RequestRow | null> {
-  const row = await sheets.findOne('Requests', (r) => {
+  const row = await repo.findOne('Requests', (r) => {
     return String(r['id']) === id && String(r['organizationId']) === organizationId;
   });
   return row ? (row as unknown as RequestRow) : null;
 }
 
 export async function listOrgRequests(
-  sheets: SheetsClient,
+  repo: Repository,
   organizationId: string,
 ): Promise<RequestRow[]> {
-  const rows = await sheets.rows('Requests');
+  const rows = await repo.rows('Requests');
   return rows
     .filter((r) => String(r['organizationId']) === organizationId)
     .map((r) => r as unknown as RequestRow);
 }
 
 export async function listRequestApprovals(
-  sheets: SheetsClient,
+  repo: Repository,
   organizationId: string,
   requestId?: string,
 ): Promise<ApprovalRow[]> {
-  const rows = await sheets.rows('RequestApprovals');
+  const rows = await repo.rows('RequestApprovals');
   return rows
     .filter((a) => {
       const sameOrg = String(a['organizationId']) === organizationId;
@@ -83,10 +83,10 @@ export async function listRequestApprovals(
 }
 
 export async function appendRequest(
-  sheets: SheetsClient,
+  repo: Repository,
   record: Record<string, unknown>,
 ): Promise<void> {
-  await sheets.append('Requests', record);
+  await repo.append('Requests', record);
 }
 
 /**
@@ -94,14 +94,14 @@ export async function appendRequest(
  * patches fields, writes back. Returns the patched row.
  */
 export async function updateRequest(
-  sheets: SheetsClient,
+  repo: Repository,
   organizationId: string,
   id: string,
   expectedVersion: number,
   patch: Record<string, unknown>,
   updatedBy: string,
 ): Promise<RequestRow> {
-  const all = await listOrgRequests(sheets, organizationId);
+  const all = await listOrgRequests(repo, organizationId);
   const row = all.find((r) => r.id === id);
   if (!row) throw ApiError.notFound('Solicitud');
   if (row.version !== expectedVersion) {
@@ -110,13 +110,19 @@ export async function updateRequest(
       actualVersion: row.version,
     });
   }
-  const next = { ...row, ...patch, version: row.version + 1, updatedAt: new Date().toISOString(), updatedBy };
-  await sheets.updateWhere('Requests', 'id', id, next);
+  const next = {
+    ...row,
+    ...patch,
+    version: row.version + 1,
+    updatedAt: new Date().toISOString(),
+    updatedBy,
+  };
+  await repo.updateWhere('Requests', 'id', id, next);
   return next as RequestRow;
 }
 
 export async function updateApproval(
-  sheets: SheetsClient,
+  repo: Repository,
   organizationId: string,
   requestId: string,
   scope: ApprovalScope,
@@ -125,11 +131,11 @@ export async function updateApproval(
   reviewedBy: string,
   comment: string,
 ): Promise<ApprovalRow> {
-  const all = await listRequestApprovals(sheets, organizationId, requestId);
+  const all = await listRequestApprovals(repo, organizationId, requestId);
   const candidates = all.filter((a) => a.scope === scope);
   const matched =
     scope === 'AREA' && areaId
-      ? candidates.find((a) => a.areaId === areaId) ?? candidates[0]
+      ? (candidates.find((a) => a.areaId === areaId) ?? candidates[0])
       : candidates[0];
   if (!matched) throw ApiError.notFound('Aprobación');
   if (matched.status === 'APPROVED' || matched.status === 'REJECTED') {
@@ -146,7 +152,7 @@ export async function updateApproval(
     updatedBy: reviewedBy,
     version: matched.version + 1,
   };
-  await sheets.updateWhere('RequestApprovals', 'id', matched.id, next);
+  await repo.updateWhere('RequestApprovals', 'id', matched.id, next);
   return next as ApprovalRow;
 }
 

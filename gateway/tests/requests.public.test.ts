@@ -7,7 +7,9 @@ describe('public requests', () => {
     it('produces a stable base64url hash matching SHA-256 of token+pepper', () => {
       const token = 'tok_abc123';
       const pepper = 'pepper_xyz';
-      const expected = createHash('sha256').update(token + pepper).digest('base64url');
+      const expected = createHash('sha256')
+        .update(token + pepper)
+        .digest('base64url');
       expect(hashPublicToken(token, pepper)).toBe(expected);
     });
 

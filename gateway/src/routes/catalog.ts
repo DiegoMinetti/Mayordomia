@@ -6,7 +6,7 @@
  * shapes that the frontend already consumes.
  */
 import { ApiError } from '../errors.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 
 function asBool(v: unknown): boolean {
@@ -64,7 +64,10 @@ function toRole(row: Record<string, unknown>) {
   const raw = row['permissionIds'];
   let permissions: string[] = [];
   if (typeof raw === 'string') {
-    permissions = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    permissions = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   } else if (Array.isArray(raw)) {
     permissions = raw.map(String);
   }
@@ -78,13 +81,13 @@ function toRole(row: Record<string, unknown>) {
 }
 
 export interface CatalogHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
 export function makeCatalogHandlers(deps: CatalogHandlersDeps) {
   async function organization(_payload: Record<string, unknown>, ctx: DispatchContext) {
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Organizations', (r) => String(r['id']) === orgId);
+    const row = await deps.repo.findOne('Organizations', (r) => String(r['id']) === orgId);
     if (!row) throw ApiError.notFound('Organization');
     return { organization: toOrg(row) };
   }
@@ -96,7 +99,7 @@ export function makeCatalogHandlers(deps: CatalogHandlersDeps) {
 
   async function listSites(_payload: Record<string, unknown>, ctx: DispatchContext) {
     const orgId = ctx.auth!.organizationId;
-    const rows = (await deps.sheets.rows('Sites')).filter(
+    const rows = (await deps.repo.rows('Sites')).filter(
       (r) => String(r['organizationId']) === orgId,
     );
     return { sites: rows.map(toSite) };
@@ -104,7 +107,7 @@ export function makeCatalogHandlers(deps: CatalogHandlersDeps) {
 
   async function listUsers(_payload: Record<string, unknown>, ctx: DispatchContext) {
     const orgId = ctx.auth!.organizationId;
-    const rows = (await deps.sheets.rows('Users')).filter(
+    const rows = (await deps.repo.rows('Users')).filter(
       (r) => String(r['organizationId']) === orgId,
     );
     return { users: rows.map(toUser) };
@@ -112,7 +115,7 @@ export function makeCatalogHandlers(deps: CatalogHandlersDeps) {
 
   async function listRoles(_payload: Record<string, unknown>, ctx: DispatchContext) {
     const orgId = ctx.auth!.organizationId;
-    const rows = (await deps.sheets.rows('Roles')).filter(
+    const rows = (await deps.repo.rows('Roles')).filter(
       (r) => String(r['organizationId']) === orgId,
     );
     return { roles: rows.map(toRole) };

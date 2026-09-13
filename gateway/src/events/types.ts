@@ -4,7 +4,14 @@
 export const EVENT_KINDS = ['SERVICE', 'ACTIVITY', 'MEETING', 'OTHER'] as const;
 export type EventKind = (typeof EVENT_KINDS)[number];
 
-export const EVENT_STATUSES = ['DRAFT', 'PLANNED', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] as const;
+export const EVENT_STATUSES = [
+  'DRAFT',
+  'PLANNED',
+  'CONFIRMED',
+  'IN_PROGRESS',
+  'COMPLETED',
+  'CANCELLED',
+] as const;
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
 export interface EventRow {

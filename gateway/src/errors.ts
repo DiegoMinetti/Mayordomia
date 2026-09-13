@@ -26,11 +26,14 @@ export class ApiException extends Error {
 export const ApiError = {
   badRequest: (code: string, message: string, details?: unknown) =>
     new ApiException(code, message, 400, details ?? null),
-  unauthorized: (message = 'Autenticación requerida') => new ApiException('UNAUTHORIZED', message, 401),
+  unauthorized: (message = 'Autenticación requerida') =>
+    new ApiException('UNAUTHORIZED', message, 401),
   forbidden: (permission: string) =>
     new ApiException('FORBIDDEN', 'Permiso insuficiente', 403, { permission }),
   notFound: (entity: string) => new ApiException('NOT_FOUND', `${entity} no encontrado`, 404),
-  conflict: (code: string, message: string, details?: unknown) => new ApiException(code, message, 409, details ?? null),
-  rateLimited: () => new ApiException('RATE_LIMITED', 'Demasiadas solicitudes; intentá más tarde', 429),
+  conflict: (code: string, message: string, details?: unknown) =>
+    new ApiException(code, message, 409, details ?? null),
+  rateLimited: () =>
+    new ApiException('RATE_LIMITED', 'Demasiadas solicitudes; intentá más tarde', 429),
   internal: (code: string, message: string) => new ApiException(code, message, 500),
 } as const;

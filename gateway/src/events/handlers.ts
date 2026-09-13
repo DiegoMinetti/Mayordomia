@@ -9,7 +9,7 @@
  */
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 import {
   EVENT_KINDS,
@@ -20,18 +20,22 @@ import {
 } from './types.js';
 
 export interface EventsHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
-async function listEvents(sheets: SheetsClient, organizationId: string): Promise<EventRow[]> {
-  const rows = await sheets.rows('Events');
+async function listEvents(repo: Repository, organizationId: string): Promise<EventRow[]> {
+  const rows = await repo.rows('Events');
   return rows
     .filter((r) => String(r['organizationId']) === organizationId)
     .map((r) => r as unknown as EventRow);
 }
 
-async function listEventAreas(sheets: SheetsClient, organizationId: string, eventId?: string): Promise<EventAreaRow[]> {
-  const rows = await sheets.rows('EventAreas');
+async function listEventAreas(
+  repo: Repository,
+  organizationId: string,
+  eventId?: string,
+): Promise<EventAreaRow[]> {
+  const rows = await repo.rows('EventAreas');
   return rows
     .filter((r) => {
       const sameOrg = String(r['organizationId']) === organizationId;
@@ -41,8 +45,12 @@ async function listEventAreas(sheets: SheetsClient, organizationId: string, even
     .map((r) => r as unknown as EventAreaRow);
 }
 
-async function listEventResources(sheets: SheetsClient, organizationId: string, eventId?: string): Promise<EventResourceRow[]> {
-  const rows = await sheets.rows('EventResources');
+async function listEventResources(
+  repo: Repository,
+  organizationId: string,
+  eventId?: string,
+): Promise<EventResourceRow[]> {
+  const rows = await repo.rows('EventResources');
   return rows
     .filter((r) => {
       const sameOrg = String(r['organizationId']) === organizationId;
@@ -105,7 +113,7 @@ export function makeEventsHandlers(deps: EventsHandlersDeps) {
       startAfter: parseDateInput(payload['startAfter'], 'startAfter'),
       endBefore: parseDateInput(payload['endBefore'], 'endBefore'),
     };
-    let rows = await listEvents(deps.sheets, orgId);
+    let rows = await listEvents(deps.repo, orgId);
     if (filters.siteId) rows = rows.filter((r) => r.siteId === filters.siteId);
     if (filters.status) rows = rows.filter((r) => r.status === filters.status);
     if (filters.kind) rows = rows.filter((r) => r.kind === filters.kind);
@@ -119,8 +127,8 @@ export function makeEventsHandlers(deps: EventsHandlersDeps) {
     }
     rows.sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
     const [areas, resources] = await Promise.all([
-      listEventAreas(deps.sheets, orgId),
-      listEventResources(deps.sheets, orgId),
+      listEventAreas(deps.repo, orgId),
+      listEventResources(deps.repo, orgId),
     ]);
     const areasByEvent = new Map<string, EventAreaRow[]>();
     for (const a of areas) {
@@ -135,7 +143,9 @@ export function makeEventsHandlers(deps: EventsHandlersDeps) {
       resourcesByEvent.set(r.eventId, list);
     }
     return {
-      events: rows.map((r) => toEvent(r, areasByEvent.get(r.id) ?? [], resourcesByEvent.get(r.id) ?? [])),
+      events: rows.map((r) =>
+        toEvent(r, areasByEvent.get(r.id) ?? [], resourcesByEvent.get(r.id) ?? []),
+      ),
     };
   }
 
@@ -143,13 +153,13 @@ export function makeEventsHandlers(deps: EventsHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Events', (r) => {
+    const row = await deps.repo.findOne('Events', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Evento');
     const [areas, resources] = await Promise.all([
-      listEventAreas(deps.sheets, orgId, id),
-      listEventResources(deps.sheets, orgId, id),
+      listEventAreas(deps.repo, orgId, id),
+      listEventResources(deps.repo, orgId, id),
     ]);
     return { event: toEvent(row as unknown as EventRow, areas, resources) };
   }
@@ -161,10 +171,12 @@ export function makeEventsHandlers(deps: EventsHandlersDeps) {
       throw ApiError.badRequest('VALIDATION_ERROR', 'days debe estar entre 1 y 365');
     }
     const orgId = ctx.auth!.organizationId;
-    const status = payload['status'] ? enumValue(payload['status'], 'status', EVENT_STATUSES) : null;
+    const status = payload['status']
+      ? enumValue(payload['status'], 'status', EVENT_STATUSES)
+      : null;
     const now = new Date();
     const until = new Date(now.getTime() + days * 86_400_000);
-    let rows = await listEvents(deps.sheets, orgId);
+    let rows = await listEvents(deps.repo, orgId);
     rows = rows.filter((r) => {
       const start = new Date(r.startAt).getTime();
       return start >= now.getTime() && start <= until.getTime();

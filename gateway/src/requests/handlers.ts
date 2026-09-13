@@ -17,7 +17,7 @@ import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object, string } from '../validation.js';
 import * as AuthService from '../auth/service.js';
 import type { AuditService } from '../audit/service.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 import {
   REQUEST_TYPES,
@@ -37,11 +37,14 @@ import {
 } from './repository.js';
 
 export interface RequestsHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
   audit: AuditService;
   /** Optional. When absent, approval notifications are silently skipped. */
   notifications?: {
-    publish(input: Record<string, unknown>, ctx: { auth?: { user: { id: string }; organizationId: string }; requestId?: string }): Promise<unknown>;
+    publish(
+      input: Record<string, unknown>,
+      ctx: { auth?: { user: { id: string }; organizationId: string }; requestId?: string },
+    ): Promise<unknown>;
   };
 }
 
@@ -115,13 +118,19 @@ function computeRequestStatus(row: RequestRow, approvals: ApprovalRow[]): Reques
   if (approvals.some((a) => a.status === 'REJECTED')) return 'REJECTED';
   if (approvals.every((a) => a.status === 'APPROVED')) return 'APPROVED';
   const general = approvals.filter((a) => a.scope === 'GENERAL');
-  if (general.length && general.every((a) => a.status === 'PENDING')) return 'PENDING_GENERAL_APPROVAL';
+  if (general.length && general.every((a) => a.status === 'PENDING'))
+    return 'PENDING_GENERAL_APPROVAL';
   return 'PENDING_AREA_APPROVAL';
 }
 
 function buildTimeline(row: RequestRow, approvals: ApprovalRow[]) {
   const events: Array<Record<string, unknown>> = [];
-  events.push({ at: row.createdAt, kind: 'CREATED', actor: row.createdBy ?? '', label: 'Solicitud creada' });
+  events.push({
+    at: row.createdAt,
+    kind: 'CREATED',
+    actor: row.createdBy ?? '',
+    label: 'Solicitud creada',
+  });
   for (const a of approvals) {
     if (a.reviewedAt) {
       events.push({
@@ -136,13 +145,22 @@ function buildTimeline(row: RequestRow, approvals: ApprovalRow[]) {
     }
   }
   if (row.updatedAt && row.updatedAt !== row.createdAt) {
-    events.push({ at: row.updatedAt, kind: 'STATUS_CHANGED', actor: row.updatedBy ?? '', label: 'Estado actualizado' });
+    events.push({
+      at: row.updatedAt,
+      kind: 'STATUS_CHANGED',
+      actor: row.updatedBy ?? '',
+      label: 'Estado actualizado',
+    });
   }
   events.sort((a, b) => String(a['at']).localeCompare(String(b['at'])));
   return events;
 }
 
-function pickApproval(approvals: ApprovalRow[], scope: 'AREA' | 'GENERAL', currentArea: string | undefined): ApprovalRow | null {
+function pickApproval(
+  approvals: ApprovalRow[],
+  scope: 'AREA' | 'GENERAL',
+  currentArea: string | undefined,
+): ApprovalRow | null {
   const rows = approvals.filter((a) => a.scope === scope);
   if (scope !== 'AREA') return rows[0] ?? null;
   if (!currentArea) return rows[0] ?? null;
@@ -169,7 +187,10 @@ async function publishApprovalNotification(
         entityType: 'Request',
         entityId: request.id,
       },
-      { auth: { user: { id: 'system' }, organizationId: ctx.auth?.organizationId ?? '' }, requestId: ctx.requestId },
+      {
+        auth: { user: { id: 'system' }, organizationId: ctx.auth?.organizationId ?? '' },
+        requestId: ctx.requestId,
+      },
     );
   } catch {
     // best-effort
@@ -188,7 +209,7 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
       until: parseDate(payload['until'], 'until'),
     };
     const orgId = ctx.auth!.organizationId;
-    let rows = await listOrgRequests(deps.sheets, orgId);
+    let rows = await listOrgRequests(deps.repo, orgId);
     if (filters.status) rows = rows.filter((r) => r.status === filters.status);
     if (filters.type) rows = rows.filter((r) => r.type === filters.type);
     if (filters.kind) rows = rows.filter((r) => r.kind === filters.kind);
@@ -203,7 +224,7 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
     }
     rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     const approvalsByRequest = new Map<string, ApprovalRow[]>();
-    for (const a of await listRequestApprovals(deps.sheets, orgId)) {
+    for (const a of await listRequestApprovals(deps.repo, orgId)) {
       const list = approvalsByRequest.get(a.requestId) ?? [];
       list.push(a);
       approvalsByRequest.set(a.requestId, list);
@@ -217,9 +238,9 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await findRequest(deps.sheets, id, orgId);
+    const row = await findRequest(deps.repo, id, orgId);
     if (!row) throw ApiError.notFound('Solicitud');
-    const approvals = await listRequestApprovals(deps.sheets, orgId, id);
+    const approvals = await listRequestApprovals(deps.repo, orgId, id);
     return {
       request: {
         ...toListItem(row, approvals),
@@ -243,17 +264,24 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
     if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
       throw ApiError.badRequest('VALIDATION_ERROR', 'expectedVersion debe ser un entero positivo');
     }
-    const comment = payload['comment'] ? string(payload['comment'], 'comment', { max: 500 }).replace(/[<>]/g, '') : '';
+    const comment = payload['comment']
+      ? string(payload['comment'], 'comment', { max: 500 }).replace(/[<>]/g, '')
+      : '';
     const required = scope === 'AREA' ? areaPermission : generalPermission;
     AuthService.requirePermission(ctx.auth!, required);
     return { id, scope, expectedVersion, comment };
   }
 
   async function approve(payload: Record<string, unknown>, ctx: DispatchContext) {
-    const input = parseDecisionPayload(payload, ctx, 'request.approve.area', 'request.approve.general');
+    const input = parseDecisionPayload(
+      payload,
+      ctx,
+      'request.approve.area',
+      'request.approve.general',
+    );
     const orgId = ctx.auth!.organizationId;
     const actorId = String(ctx.auth!.user['id']);
-    const request = await findRequest(deps.sheets, input.id, orgId);
+    const request = await findRequest(deps.repo, input.id, orgId);
     if (!request) throw ApiError.notFound('Solicitud');
     if (
       request.status === 'APPROVED' ||
@@ -263,13 +291,29 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
     ) {
       throw ApiError.conflict('REQUEST_LOCKED', 'La solicitud ya fue cerrada');
     }
-    const approvals = await listRequestApprovals(deps.sheets, orgId, input.id);
+    const approvals = await listRequestApprovals(deps.repo, orgId, input.id);
     const approval = pickApproval(approvals, input.scope, request.currentArea);
     if (!approval) throw ApiError.notFound('Aprobación');
-    await updateApproval(deps.sheets, orgId, input.id, input.scope, approval.areaId, 'APPROVED', actorId, input.comment);
-    const fresh = await listRequestApprovals(deps.sheets, orgId, input.id);
+    await updateApproval(
+      deps.repo,
+      orgId,
+      input.id,
+      input.scope,
+      approval.areaId,
+      'APPROVED',
+      actorId,
+      input.comment,
+    );
+    const fresh = await listRequestApprovals(deps.repo, orgId, input.id);
     const nextStatus = computeRequestStatus(request, fresh);
-    const updated = await updateRequest(deps.sheets, orgId, input.id, input.expectedVersion, { status: nextStatus }, actorId);
+    const updated = await updateRequest(
+      deps.repo,
+      orgId,
+      input.id,
+      input.expectedVersion,
+      { status: nextStatus },
+      actorId,
+    );
     await deps.audit.record({
       organizationId: orgId,
       actorId,
@@ -285,16 +329,37 @@ export function makeRequestsHandlers(deps: RequestsHandlersDeps) {
   }
 
   async function reject(payload: Record<string, unknown>, ctx: DispatchContext) {
-    const input = parseDecisionPayload(payload, ctx, 'request.approve.area', 'request.approve.general');
+    const input = parseDecisionPayload(
+      payload,
+      ctx,
+      'request.approve.area',
+      'request.approve.general',
+    );
     const orgId = ctx.auth!.organizationId;
     const actorId = String(ctx.auth!.user['id']);
-    const request = await findRequest(deps.sheets, input.id, orgId);
+    const request = await findRequest(deps.repo, input.id, orgId);
     if (!request) throw ApiError.notFound('Solicitud');
-    const approvals = await listRequestApprovals(deps.sheets, orgId, input.id);
+    const approvals = await listRequestApprovals(deps.repo, orgId, input.id);
     const approval = pickApproval(approvals, input.scope, request.currentArea);
     if (!approval) throw ApiError.notFound('Aprobación');
-    await updateApproval(deps.sheets, orgId, input.id, input.scope, approval.areaId, 'REJECTED', actorId, input.comment);
-    const updated = await updateRequest(deps.sheets, orgId, input.id, input.expectedVersion, { status: 'REJECTED' }, actorId);
+    await updateApproval(
+      deps.repo,
+      orgId,
+      input.id,
+      input.scope,
+      approval.areaId,
+      'REJECTED',
+      actorId,
+      input.comment,
+    );
+    const updated = await updateRequest(
+      deps.repo,
+      orgId,
+      input.id,
+      input.expectedVersion,
+      { status: 'REJECTED' },
+      actorId,
+    );
     await deps.audit.record({
       organizationId: orgId,
       actorId,

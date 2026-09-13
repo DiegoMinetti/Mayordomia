@@ -4,7 +4,7 @@
  */
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 
 const KINDS = ['CORRECTIVE', 'PREVENTIVE', 'INSPECTION'] as const;
@@ -12,7 +12,7 @@ const SEVERITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
 const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'] as const;
 
 export interface MaintenanceHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
 function toMaintenance(r: Record<string, unknown>) {
@@ -28,7 +28,18 @@ function toMaintenance(r: Record<string, unknown>) {
     createdAt: String(r['createdAt'] ?? ''),
     version: Number(r['version'] ?? 1),
   };
-  for (const opt of ['siteId', 'resourceId', 'resolution', 'supplierId', 'sourceDeliveryItemId', 'startedAt', 'resolvedAt', 'updatedAt', 'createdBy', 'updatedBy']) {
+  for (const opt of [
+    'siteId',
+    'resourceId',
+    'resolution',
+    'supplierId',
+    'sourceDeliveryItemId',
+    'startedAt',
+    'resolvedAt',
+    'updatedAt',
+    'createdBy',
+    'updatedBy',
+  ]) {
     const v = r[opt];
     if (v !== undefined && v !== '') out[opt] = String(v);
   }
@@ -61,11 +72,14 @@ export function makeMaintenanceHandlers(deps: MaintenanceHandlersDeps) {
       resourceId: payload['resourceId'] ? validateId(payload['resourceId'], 'resourceId') : null,
       siteId: payload['siteId'] ? validateId(payload['siteId'], 'siteId') : null,
     };
-    let rows = (await deps.sheets.rows('Maintenance')).filter((r) => String(r['organizationId']) === orgId);
+    let rows = (await deps.repo.rows('Maintenance')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     if (filters.status) rows = rows.filter((r) => String(r['status']) === filters.status);
     if (filters.kind) rows = rows.filter((r) => String(r['kind']) === filters.kind);
     if (filters.severity) rows = rows.filter((r) => String(r['severity']) === filters.severity);
-    if (filters.resourceId) rows = rows.filter((r) => String(r['resourceId']) === filters.resourceId);
+    if (filters.resourceId)
+      rows = rows.filter((r) => String(r['resourceId']) === filters.resourceId);
     if (filters.siteId) rows = rows.filter((r) => String(r['siteId']) === filters.siteId);
     rows.sort((a, b) => String(b['reportedAt'] ?? '').localeCompare(String(a['reportedAt'] ?? '')));
     return { maintenance: rows.map(toMaintenance) };
@@ -75,11 +89,11 @@ export function makeMaintenanceHandlers(deps: MaintenanceHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('Maintenance', (r) => {
+    const row = await deps.repo.findOne('Maintenance', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Mantenimiento');
-    const updates = (await deps.sheets.rows('MaintenanceUpdates'))
+    const updates = (await deps.repo.rows('MaintenanceUpdates'))
       .filter((u) => String(u['organizationId']) === orgId && String(u['maintenanceId']) === id)
       .sort((a, b) => String(a['at'] ?? '').localeCompare(String(b['at'] ?? '')))
       .map(toMaintenanceUpdate);

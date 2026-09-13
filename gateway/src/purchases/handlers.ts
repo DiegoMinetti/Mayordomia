@@ -4,13 +4,20 @@
  */
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object } from '../validation.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 
-const REQUEST_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED', 'COMPLETED'] as const;
+const REQUEST_STATUSES = [
+  'DRAFT',
+  'SUBMITTED',
+  'APPROVED',
+  'REJECTED',
+  'CANCELLED',
+  'COMPLETED',
+] as const;
 
 export interface PurchasesHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
 }
 
 function toSupplier(r: Record<string, unknown>) {
@@ -64,8 +71,15 @@ function toQuote(r: Record<string, unknown>, supplierName: string) {
   };
 }
 
-function toRequestListItem(r: Record<string, unknown>, items: Array<Record<string, unknown>>, quoteCount: number) {
-  const totalEstimated = items.reduce((acc, it) => acc + (Number(it['estimatedCost']) || 0) * (Number(it['quantity']) || 0), 0);
+function toRequestListItem(
+  r: Record<string, unknown>,
+  items: Array<Record<string, unknown>>,
+  quoteCount: number,
+) {
+  const totalEstimated = items.reduce(
+    (acc, it) => acc + (Number(it['estimatedCost']) || 0) * (Number(it['quantity']) || 0),
+    0,
+  );
   return {
     id: String(r['id'] ?? ''),
     organizationId: String(r['organizationId'] ?? ''),
@@ -89,8 +103,11 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
     object(payload, 'payload');
     const orgId = ctx.auth!.organizationId;
     const active = payload['active'] === undefined ? null : payload['active'] === true;
-    let rows = (await deps.sheets.rows('Suppliers')).filter((r) => String(r['organizationId']) === orgId);
-    if (active !== null) rows = rows.filter((r) => (r['active'] === true || r['active'] === 'TRUE') === active);
+    let rows = (await deps.repo.rows('Suppliers')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
+    if (active !== null)
+      rows = rows.filter((r) => (r['active'] === true || r['active'] === 'TRUE') === active);
     rows.sort((a, b) => String(a['name']).localeCompare(String(b['name'])));
     return { suppliers: rows.map(toSupplier) };
   }
@@ -100,13 +117,20 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
     const orgId = ctx.auth!.organizationId;
     const filters = {
       status: payload['status'] ? enumValue(payload['status'], 'status', REQUEST_STATUSES) : null,
-      requesterId: payload['requesterId'] ? validateId(payload['requesterId'], 'requesterId') : null,
+      requesterId: payload['requesterId']
+        ? validateId(payload['requesterId'], 'requesterId')
+        : null,
     };
-    let rows = (await deps.sheets.rows('PurchaseRequests')).filter((r) => String(r['organizationId']) === orgId);
+    let rows = (await deps.repo.rows('PurchaseRequests')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     if (filters.status) rows = rows.filter((r) => String(r['status']) === filters.status);
-    if (filters.requesterId) rows = rows.filter((r) => String(r['requesterId']) === filters.requesterId);
+    if (filters.requesterId)
+      rows = rows.filter((r) => String(r['requesterId']) === filters.requesterId);
     rows.sort((a, b) => String(b['createdAt']).localeCompare(String(a['createdAt'])));
-    const itemsAll = (await deps.sheets.rows('PurchaseRequestItems')).filter((r) => String(r['organizationId']) === orgId);
+    const itemsAll = (await deps.repo.rows('PurchaseRequestItems')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     const itemsByReq = new Map<string, Array<Record<string, unknown>>>();
     for (const it of itemsAll) {
       const k = String(it['purchaseRequestId']);
@@ -114,7 +138,9 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
       list.push(it);
       itemsByReq.set(k, list);
     }
-    const quotesAll = (await deps.sheets.rows('Quotes')).filter((r) => String(r['organizationId']) === orgId);
+    const quotesAll = (await deps.repo.rows('Quotes')).filter(
+      (r) => String(r['organizationId']) === orgId,
+    );
     const quotesByReq = new Map<string, Array<Record<string, unknown>>>();
     for (const q of quotesAll) {
       const k = String(q['purchaseRequestId']);
@@ -123,7 +149,13 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
       quotesByReq.set(k, list);
     }
     return {
-      requests: rows.map((r) => toRequestListItem(r, itemsByReq.get(String(r['id'])) ?? [], (quotesByReq.get(String(r['id'])) ?? []).length)),
+      requests: rows.map((r) =>
+        toRequestListItem(
+          r,
+          itemsByReq.get(String(r['id'])) ?? [],
+          (quotesByReq.get(String(r['id'])) ?? []).length,
+        ),
+      ),
     };
   }
 
@@ -131,20 +163,21 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
     object(payload, 'payload');
     const id = validateId(payload['id'], 'id');
     const orgId = ctx.auth!.organizationId;
-    const row = await deps.sheets.findOne('PurchaseRequests', (r) => {
+    const row = await deps.repo.findOne('PurchaseRequests', (r) => {
       return String(r['id']) === id && String(r['organizationId']) === orgId;
     });
     if (!row) throw ApiError.notFound('Solicitud de compra');
-    const items = (await deps.sheets.rows('PurchaseRequestItems'))
+    const items = (await deps.repo.rows('PurchaseRequestItems'))
       .filter((r) => String(r['organizationId']) === orgId && String(r['purchaseRequestId']) === id)
       .map(toItem);
-    const quotes = (await deps.sheets.rows('Quotes'))
-      .filter((r) => String(r['organizationId']) === orgId && String(r['purchaseRequestId']) === id);
+    const quotes = (await deps.repo.rows('Quotes')).filter(
+      (r) => String(r['organizationId']) === orgId && String(r['purchaseRequestId']) === id,
+    );
     const supplierNameById = new Map<string, string>();
     for (const q of quotes) {
       const supplierId = String(q['supplierId']);
       if (!supplierNameById.has(supplierId)) {
-        const supplier = await deps.sheets.findOne('Suppliers', (r) => {
+        const supplier = await deps.repo.findOne('Suppliers', (r) => {
           return String(r['id']) === supplierId && String(r['organizationId']) === orgId;
         });
         supplierNameById.set(supplierId, supplier ? String(supplier['name'] ?? '') : '');
@@ -161,19 +194,22 @@ export function makePurchasesHandlers(deps: PurchasesHandlersDeps) {
     object(payload, 'payload');
     const requestId = validateId(payload['requestId'], 'requestId');
     const orgId = ctx.auth!.organizationId;
-    const rows = (await deps.sheets.rows('Quotes'))
-      .filter((r) => String(r['organizationId']) === orgId && String(r['purchaseRequestId']) === requestId);
+    const rows = (await deps.repo.rows('Quotes')).filter(
+      (r) => String(r['organizationId']) === orgId && String(r['purchaseRequestId']) === requestId,
+    );
     const supplierNameById = new Map<string, string>();
     for (const r of rows) {
       const supplierId = String(r['supplierId']);
       if (!supplierNameById.has(supplierId)) {
-        const supplier = await deps.sheets.findOne('Suppliers', (s) => {
+        const supplier = await deps.repo.findOne('Suppliers', (s) => {
           return String(s['id']) === supplierId && String(s['organizationId']) === orgId;
         });
         supplierNameById.set(supplierId, supplier ? String(supplier['name'] ?? '') : '');
       }
     }
-    return { quotes: rows.map((r) => toQuote(r, supplierNameById.get(String(r['supplierId'])) ?? '')) };
+    return {
+      quotes: rows.map((r) => toQuote(r, supplierNameById.get(String(r['supplierId'])) ?? '')),
+    };
   }
 
   return { listSuppliers, listRequests, getRequest, listQuotes };

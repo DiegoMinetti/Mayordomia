@@ -1,11 +1,11 @@
 /**
  * Health endpoint — port of apps-script/Health.gs.
  *
- * Returns the version, schema info, and the status of each provider (sheets,
+ * Returns the version, schema info, and the status of each provider (repo,
  * sqlite, calendar, email). `push` always reports NOT_AVAILABLE because we
  * don't run a Web Push provider yet.
  */
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { Config } from '../config.js';
 import type { DispatchContext } from '../router/index.js';
 import type { Db } from '../db/index.js';
@@ -16,14 +16,14 @@ export const VERSION = '0.1.0';
 export const SCHEMA_VERSION = 1;
 
 export interface HealthHandlersDeps {
-  sheets: SheetsClient;
+  repo: Repository;
   config: Config;
   db?: Db;
 }
 
 export function makeHealthHandlers(deps: HealthHandlersDeps) {
   async function check(_payload: Record<string, unknown>, ctx: DispatchContext) {
-    const sheets = await probeSheets(deps.sheets);
+    const repo = await probeSheets(deps.repo);
     const sqlite = probeSqlite(deps.db);
     return {
       version: VERSION,
@@ -33,7 +33,7 @@ export function makeHealthHandlers(deps: HealthHandlersDeps) {
         status: 'NOT_APPLICABLE',
         reason: 'Drive provider not needed in Node gateway (descriptor lives in spreadsheet)',
       },
-      sheets,
+      repo,
       sqlite,
       calendar: deps.config.calendarId
         ? { status: 'NOT_PROBED', reason: 'Calendar integration not yet ported' }
@@ -51,11 +51,9 @@ export function makeHealthHandlers(deps: HealthHandlersDeps) {
   return { check };
 }
 
-async function probeSheets(
-  sheets: SheetsClient,
-): Promise<{ status: 'OK' | 'ERROR'; detail?: string }> {
+async function probeSheets(repo: Repository): Promise<{ status: 'OK' | 'ERROR'; detail?: string }> {
   try {
-    await sheets.rows('Organizations');
+    await repo.rows('Organizations');
     return { status: 'OK' };
   } catch (error) {
     if (error instanceof ApiException) {

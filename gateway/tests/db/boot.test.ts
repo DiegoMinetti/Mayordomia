@@ -10,7 +10,7 @@ import {
 } from '../../src/db/index.js';
 import { buildApp } from '../../src/server.js';
 import { makeAuditService } from '../../src/audit/service.js';
-import type { SheetsClient } from '../../src/sheets/client.js';
+import type { Repository } from '../../src/repo/client.js';
 import type { Config } from '../../src/config.js';
 
 // Real pino logger to silence output — the vi.fn()-based fake breaks pino-http
@@ -33,7 +33,7 @@ const baseConfig: Config = {
   rateLimit: { windowMs: 60_000, max: 100 },
 };
 
-function fakeSheets(): SheetsClient {
+function fakeRepo(): Repository {
   return {
     raw: {} as never,
     spreadsheetId: 'ss-test',
@@ -50,8 +50,8 @@ describe('db boot integration', () => {
     const app = buildApp({
       config: baseConfig,
       logger: silentLogger,
-      sheets: fakeSheets(),
-      audit: makeAuditService(fakeSheets(), silentLogger),
+      repo: fakeRepo(),
+      audit: makeAuditService(fakeRepo(), silentLogger),
     });
     const res = await request(app).get('/ping');
     expect(res.status).toBe(200);
@@ -64,8 +64,8 @@ describe('db boot integration', () => {
     const app = buildApp({
       config: baseConfig,
       logger: silentLogger,
-      sheets: fakeSheets(),
-      audit: makeAuditService(fakeSheets(), silentLogger),
+      repo: fakeRepo(),
+      audit: makeAuditService(fakeRepo(), silentLogger),
       db,
     });
     const res = await request(app).get('/ping');
@@ -78,7 +78,7 @@ describe('db boot integration', () => {
     const db = openDatabase({ path: ':memory:' });
     const { applied } = applyMigrations(db, defaultMigrationsDir());
     const { makeHealthHandlers } = await import('../../src/routes/health.js');
-    const health = makeHealthHandlers({ sheets: fakeSheets(), config: baseConfig, db });
+    const health = makeHealthHandlers({ repo: fakeRepo(), config: baseConfig, db });
     const result = await health.check({}, { requestId: 'test', auth: undefined });
 
     expect(result.sqlite).toMatchObject({
@@ -92,7 +92,7 @@ describe('db boot integration', () => {
 
   it('system.health reports sqlite NOT_CONFIGURED when no DB is passed', async () => {
     const { makeHealthHandlers } = await import('../../src/routes/health.js');
-    const health = makeHealthHandlers({ sheets: fakeSheets(), config: baseConfig });
+    const health = makeHealthHandlers({ repo: fakeRepo(), config: baseConfig });
     const result = await health.check({}, { requestId: 'test', auth: undefined });
     expect(result.sqlite).toEqual({ status: 'NOT_CONFIGURED' });
   });

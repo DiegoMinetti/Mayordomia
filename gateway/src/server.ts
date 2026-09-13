@@ -4,7 +4,7 @@ import { pinoHttp } from 'pino-http';
 import { randomUUID } from 'node:crypto';
 import { loadConfig, type Config } from './config.js';
 import { createLogger, type Logger } from './logging.js';
-import { createSheetsClient, type SheetsClient } from './sheets/client.js';
+import { makeRepository, type Repository } from './repository/index.js';
 import { makeAuditService, type AuditService } from './audit/service.js';
 import { dispatch, register, type DispatchDeps } from './router/index.js';
 import { ok, fail } from './envelope.js';
@@ -24,7 +24,7 @@ import { openDatabase, applyMigrations, defaultMigrationsDir, type Db } from './
 export interface ServerDeps {
   config: Config;
   logger: Logger;
-  sheets: SheetsClient;
+  repo: Repository;
   audit: AuditService;
   /**
    * Optional SQLite handle. PR 2 will make this required and rewire all
@@ -35,7 +35,7 @@ export interface ServerDeps {
 }
 
 export function buildApp(deps: ServerDeps): Express {
-  const { config, logger, sheets, audit, db } = deps;
+  const { config, logger, repo, audit, db } = deps;
   const app = express();
 
   app.use(
@@ -73,17 +73,17 @@ export function buildApp(deps: ServerDeps): Express {
   });
 
   // Register all routes that exist in this build.
-  const catalog = makeCatalogHandlers({ sheets });
-  const health = makeHealthHandlers({ sheets, config, ...(db ? { db } : {}) });
-  const requests = makeRequestsHandlers({ sheets, audit });
-  const resources = makeResourcesHandlers({ sheets });
-  const events = makeEventsHandlers({ sheets });
-  const operations = makeOperationsHandlers({ sheets });
-  const maintenance = makeMaintenanceHandlers({ sheets });
-  const purchases = makePurchasesHandlers({ sheets });
-  const notifications = makeNotificationsHandlers({ sheets });
+  const catalog = makeCatalogHandlers({ repo });
+  const health = makeHealthHandlers({ repo, config, ...(db ? { db } : {}) });
+  const requests = makeRequestsHandlers({ repo, audit });
+  const resources = makeResourcesHandlers({ repo });
+  const events = makeEventsHandlers({ repo });
+  const operations = makeOperationsHandlers({ repo });
+  const maintenance = makeMaintenanceHandlers({ repo });
+  const purchases = makePurchasesHandlers({ repo });
+  const notifications = makeNotificationsHandlers({ repo });
   const rateLimit = makeRateLimiter(config.rateLimit);
-  const dispatchDeps: DispatchDeps = { sheets, audit };
+  const dispatchDeps: DispatchDeps = { repo, audit };
 
   register('system.health', { auth: true, permission: 'config.manage' }, (payload, ctx) =>
     health.check(payload, ctx),
@@ -172,7 +172,7 @@ export function buildApp(deps: ServerDeps): Express {
   // requests.createPublic needs PUBLIC_TOKEN_PEPPER; skip the route when absent.
   if (config.publicTokenPepper) {
     const publicRequests = makePublicRequestsHandlers({
-      sheets,
+      repo,
       audit,
       publicTokenPepper: config.publicTokenPepper,
       rateLimit,
@@ -232,7 +232,7 @@ export async function createServer(): Promise<{
   app: Express;
   config: Config;
   logger: Logger;
-  sheets: SheetsClient;
+  repo: Repository;
   db: Db;
 }> {
   const config = loadConfig();
@@ -250,37 +250,9 @@ export async function createServer(): Promise<{
   } else {
     logger.info({ total: migrationResult.total }, 'sqlite migrations up to date');
   }
-  // Sheets is deprecated during the Sheets→SQLite migration (PR 1 → PR 2). If
-  // SPREADSHEET_ID is unset, we skip Sheets entirely: the existing PR-merged
-  // handlers will fail loudly at runtime when they try to read, but the boot
-  // succeeds and SQLite + health work. Once PR 2 rewrites the handlers, the
-  // Sheets code path goes away.
-  const sheets = config.spreadsheetId
-    ? await createSheetsClient(config, logger)
-    : (logger.warn(
-        { reason: 'SPREADSHEET_ID not set' },
-        'sheets client disabled — handlers will fail until PR 2',
-      ),
-      {
-        raw: {} as never,
-        spreadsheetId: '',
-        rows: async () => {
-          throw new Error(
-            'Sheets client disabled (PR 1 transition): set SPREADSHEET_ID or wait for PR 2',
-          );
-        },
-        findOne: async () => {
-          throw new Error('Sheets client disabled (PR 1 transition)');
-        },
-        append: async () => {
-          throw new Error('Sheets client disabled (PR 1 transition)');
-        },
-        updateWhere: async () => {
-          throw new Error('Sheets client disabled (PR 1 transition)');
-        },
-        close: () => undefined,
-      } satisfies SheetsClient);
-  const audit = makeAuditService(sheets, logger);
-  const app = buildApp({ config, logger, sheets, audit, db });
-  return { app, config, logger, sheets, db };
+  // PR 2: SQLite is the only store. Sheets/Google config is no longer required.
+  const repo = makeRepository(db);
+  const audit = makeAuditService(repo, logger);
+  const app = buildApp({ config, logger, repo, audit, db });
+  return { app, config, logger, repo, db };
 }

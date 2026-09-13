@@ -25,7 +25,13 @@ export function ok<T>(data: T, requestId: string): Envelope<T> {
   return { ok: true, data: (data ?? null) as T, error: null, meta: { requestId } };
 }
 
-export function fail(code: string, message: string, requestId: string, details?: unknown, status?: number): Envelope<never> {
+export function fail(
+  code: string,
+  message: string,
+  requestId: string,
+  details?: unknown,
+  status?: number,
+): Envelope<never> {
   const body: ApiErrorBody = { code, message };
   if (details !== undefined) body.details = details;
   if (status !== undefined) body.status = status;

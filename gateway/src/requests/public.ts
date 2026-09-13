@@ -11,7 +11,7 @@ import { createHash } from 'node:crypto';
 import { ApiError } from '../errors.js';
 import { enumValue, id as validateId, object, string, email, safeText } from '../validation.js';
 import type { AuditService } from '../audit/service.js';
-import type { SheetsClient } from '../sheets/client.js';
+import type { Repository } from '../repository/index.js';
 import type { DispatchContext } from '../router/index.js';
 import { newRequestId } from './repository.js';
 
@@ -59,7 +59,9 @@ export function makeRateLimiter(config: RateLimitConfig) {
 
 export function hashPublicToken(token: string, pepper: string): string {
   // base64url is the closest equivalent to Apps Script's base64EncodeWebSafe.
-  return createHash('sha256').update(token + pepper).digest('base64url');
+  return createHash('sha256')
+    .update(token + pepper)
+    .digest('base64url');
 }
 
 function parsePublicPayload(payload: Record<string, unknown>) {
@@ -68,16 +70,20 @@ function parsePublicPayload(payload: Record<string, unknown>) {
     publicToken: validateId(payload['publicToken'], 'publicToken'),
     type: enumValue(payload['type'], 'type', PUBLIC_REQUEST_TYPES),
     requesterName: safeText(payload['requesterName'], 'requesterName', 120),
-    requesterEmail: payload['requesterEmail'] ? email(payload['requesterEmail'], 'requesterEmail') : '',
+    requesterEmail: payload['requesterEmail']
+      ? email(payload['requesterEmail'], 'requesterEmail')
+      : '',
     description: safeText(payload['description'], 'description', 2000),
-    requestedFor: payload['requestedFor'] ? string(payload['requestedFor'], 'requestedFor', { max: 40 }) : '',
+    requestedFor: payload['requestedFor']
+      ? string(payload['requestedFor'], 'requestedFor', { max: 40 })
+      : '',
     // honeypot — Apps Script rejects any request that has this filled in.
     website: payload['website'] ? String(payload['website']) : '',
   };
 }
 
 export interface PublicRequestsDeps {
-  sheets: SheetsClient;
+  repo: Repository;
   audit: AuditService;
   /** Server-side pepper. Required. */
   publicTokenPepper: string;
@@ -90,13 +96,13 @@ export function makePublicRequestsHandlers(deps: PublicRequestsDeps) {
     if (data.website) throw ApiError.badRequest('SPAM_DETECTED', 'Solicitud inválida');
     deps.rateLimit.assertAllowed(data.publicToken);
     const tokenHash = hashPublicToken(data.publicToken, deps.publicTokenPepper);
-    const access = await deps.sheets.findOne('PublicAccessTokens', (r) => {
+    const access = await deps.repo.findOne('PublicAccessTokens', (r) => {
       return String(r['tokenHash']) === tokenHash && String(r['status']) === 'ACTIVE';
     });
     if (!access) throw ApiError.notFound('Acceso público');
     const id = newRequestId();
     const now = new Date().toISOString();
-    await deps.sheets.append('Requests', {
+    await deps.repo.append('Requests', {
       id,
       organizationId: String(access['organizationId'] ?? ''),
       siteId: access['siteId'] ? String(access['siteId']) : '',
