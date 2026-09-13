@@ -1,18 +1,16 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// vite.config.ts is evaluated in Node by Vite, but the project's tsconfig
-// doesn't include @types/node (it intentionally keeps the app bundle free of
-// Node globals). Read the base path from the env without pulling node types
-// in: `loadEnv` would do this cleanly but requires more setup, so we just
-// duck-type process here.
-interface ProcessLike { env?: { VITE_BASE_PATH?: string } }
-const proc: ProcessLike | undefined = (globalThis as { process?: ProcessLike }).process;
-const envBase: string | undefined = proc?.env?.['VITE_BASE_PATH'];
-
-export default defineConfig(({ command }) => {
-  const base = envBase ?? (command === 'serve' ? '/' : '/Mayordomia/');
+export default defineConfig(({ command, mode }) => {
+  // Load env files explicitly so the config sees `VITE_BASE_PATH` from
+  // .env.production. Without this, the config falls back to /Mayordomia/
+  // (the old GitHub Pages path) and assets 404 in the Pi nginx deploy.
+  const env = loadEnv(mode, process.cwd(), '');
+  const envBase = env['VITE_BASE_PATH'];
+  const base = envBase && envBase.length > 0
+    ? envBase
+    : command === 'serve' ? '/' : '/Mayordomia/';
   return {
     base,
     plugins: [react(), VitePWA({
