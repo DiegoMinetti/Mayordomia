@@ -20,6 +20,7 @@ import { makeMaintenanceHandlers } from './maintenance/handlers.js';
 import { makePurchasesHandlers } from './purchases/handlers.js';
 import { makeNotificationsHandlers } from './notifications/handlers.js';
 import { makeAuthRoutes } from './auth/routes.js';
+import { setupBootstrap } from './auth/setup.js';
 import { SESSION_PREFIX } from './auth/sessions.js';
 import { createMagicLink, consumeMagicLink, MAGIC_LINK_TTL_MS } from './auth/magicLink.js';
 import {
@@ -250,6 +251,34 @@ export function buildApp(deps: ServerDeps): Express {
     const requestId = randomUUID();
     try {
       const result = await auth.me(extractSessionToken(req));
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+
+  // PR 7 — Bootstrap endpoint. Idempotent first-run setup. Creates the org
+  // + first super-admin user in one call. Refuses if the email already exists
+  // under a different org, or if the orgId exists without this email as
+  // admin. Sets the session cookie on success.
+  app.post('/auth/setup', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await setupBootstrap(
+        repo,
+        {
+          email: String(body['email'] ?? ''),
+          password: String(body['password'] ?? ''),
+          name: String(body['name'] ?? ''),
+          organizationId:
+            typeof body['organizationId'] === 'string' ? body['organizationId'] : undefined,
+          organizationName:
+            typeof body['organizationName'] === 'string' ? body['organizationName'] : undefined,
+          timezone: typeof body['timezone'] === 'string' ? body['timezone'] : undefined,
+        },
+        res,
+      );
       res.json(ok(result, requestId));
     } catch (error) {
       next({ requestId, error });
