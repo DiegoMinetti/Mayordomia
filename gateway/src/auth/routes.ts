@@ -12,7 +12,7 @@
  * also org-scoped so RBAC stays clean.
  */
 import { randomUUID } from 'node:crypto';
-import { ApiError } from '../errors.js';
+import { ApiError, ApiException } from '../errors.js';
 import { hashPassword, verifyPassword } from './passwords.js';
 import {
   createSession,
@@ -65,6 +65,20 @@ export function makeAuthRoutes(deps: AuthRoutesDeps) {
     const name = String(payload['name'] ?? '').trim();
     if (!email || !password || !organizationId) {
       throw ApiError.badRequest('VALIDATION_ERROR', 'Faltan email, password u organizationId');
+    }
+
+    // The /auth/register endpoint only adds a user to an existing org. If
+    // the org doesn't exist yet, the FK on users.organization_id would
+    // fail with a generic 500. Check first and return a clear ORG_NOT_FOUND
+    // so the UI can guide the user to /auth/setup (which bootstraps the
+    // org + first admin in one call).
+    const orgRow = await deps.repo.findOne('organizations', (r) => r['id'] === organizationId);
+    if (!orgRow) {
+      throw new ApiException(
+        'ORG_NOT_FOUND',
+        `La organización "${organizationId}" no existe. Si es la primera cuenta de esa congregación, corré POST /api/auth/setup primero para crearla.`,
+        404,
+      );
     }
 
     const existing = await loadUser(deps.repo, email, organizationId);
