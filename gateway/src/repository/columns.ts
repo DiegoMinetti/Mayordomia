@@ -293,6 +293,14 @@ export const COLUMNS: Record<string, ColumnMap> = {
     userAgent: 'user_agent',
     ip: 'ip',
   },
+  magic_link_tokens: {
+    tokenHash: 'token_hash',
+    userId: 'user_id',
+    organizationId: 'organization_id',
+    expiresAt: 'expires_at',
+    consumedAt: 'consumed_at',
+    createdAt: 'created_at',
+  },
   audit_log: {
     id: 'id',
     organizationId: 'organization_id',

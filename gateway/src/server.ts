@@ -21,6 +21,7 @@ import { makePurchasesHandlers } from './purchases/handlers.js';
 import { makeNotificationsHandlers } from './notifications/handlers.js';
 import { makeAuthRoutes } from './auth/routes.js';
 import { SESSION_PREFIX } from './auth/sessions.js';
+import { createMagicLink, consumeMagicLink, MAGIC_LINK_TTL_MS } from './auth/magicLink.js';
 import { openDatabase, applyMigrations, defaultMigrationsDir, type Db } from './db/index.js';
 
 export interface ServerDeps {
@@ -248,6 +249,74 @@ export function buildApp(deps: ServerDeps): Express {
     }
   });
 
+  // PR 5 — Magic-link sign-in.
+  // In production: SMTP is configured via RESEND_API_KEY/RESEND_FROM and
+  // sends the link to the user. In dev: link is logged + returned in the
+  // response so the developer can click it from the dialog.
+  const publicBaseUrl = process.env['PUBLIC_BASE_URL'] ?? '';
+  const magicLinkSend = makeMagicLinkSender(config.resendApiKey, config.resendFrom, logger);
+  app.post('/auth/magic-link', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await createMagicLink(
+        repo,
+        {
+          email: String(body['email'] ?? ''),
+          organizationId: String(body['organizationId'] ?? ''),
+        },
+        magicLinkSend,
+        publicBaseUrl,
+      );
+      const data: Record<string, unknown> = {
+        expiresAt: result.expiresAt,
+        ttlMs: MAGIC_LINK_TTL_MS,
+      };
+      if (!config.resendApiKey && result.token) {
+        // Dev convenience: include the link so the dialog can navigate.
+        data['devLink'] =
+          `${publicBaseUrl || req.headers.origin || ''}/auth/magic-link/verify?token=${encodeURIComponent(result.token)}`;
+        data['token'] = result.token;
+      }
+      res.json(ok(data, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+  app.post('/auth/magic-link/verify', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const queryToken = typeof req.query['token'] === 'string' ? req.query['token'] : undefined;
+      const token = String(body['token'] ?? queryToken ?? '');
+      const consumed = await consumeMagicLink(repo, { token });
+      const { createSession } = await import('./auth/sessions.js');
+      const { token: sessionToken, session } = await createSession(repo, {
+        userId: consumed.userId,
+        organizationId: consumed.organizationId,
+        userAgent:
+          typeof req.headers['user-agent'] === 'string'
+            ? String(req.headers['user-agent'])
+            : undefined,
+        ip: typeof req.ip === 'string' ? req.ip : undefined,
+      });
+      setSessionCookie(res, sessionToken);
+      res.json(
+        ok(
+          {
+            token: sessionToken,
+            expiresAt: session.expiresAt,
+            userId: consumed.userId,
+            organizationId: consumed.organizationId,
+          },
+          requestId,
+        ),
+      );
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+
   // Single action endpoint. Mirrors Apps Script doPost() contract.
   app.post('/api', async (req: Request, res: Response, next: NextFunction) => {
     const requestId = randomUUID();
@@ -360,4 +429,42 @@ function extractSessionToken(req: Request): string | undefined {
     }
   }
   return undefined;
+}
+
+function makeMagicLinkSender(
+  resendApiKey: string | undefined,
+  resendFrom: string | undefined,
+  logger: Logger,
+): import('./auth/magicLink.js').SendMagicLink {
+  if (!resendApiKey || !resendFrom) {
+    return async (args) => {
+      logger.info(
+        { to: args.to, subject: args.subject },
+        '[magic-link] SMTP not configured — link is in response',
+      );
+    };
+  }
+  return async (args) => {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from: resendFrom,
+          to: args.to,
+          subject: args.subject,
+          text: args.text,
+          html: args.html,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        logger.error({ status: res.status, body }, '[magic-link] resend send failed');
+        throw new Error(`resend returned ${res.status}`);
+      }
+    } catch (err) {
+      logger.error({ err, to: args.to }, '[magic-link] resend send threw');
+      throw err;
+    }
+  };
 }
