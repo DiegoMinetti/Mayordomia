@@ -8,7 +8,7 @@ import { makeRepository, type Repository } from './repository/index.js';
 import { makeAuditService, type AuditService } from './audit/service.js';
 import { dispatch, register, type DispatchDeps } from './router/index.js';
 import { ok, fail } from './envelope.js';
-import { ApiException } from './errors.js';
+import { ApiException, ApiError } from './errors.js';
 import { makeCatalogHandlers } from './routes/catalog.js';
 import { makeHealthHandlers } from './routes/health.js';
 import { makeRequestsHandlers } from './requests/handlers.js';
@@ -22,6 +22,13 @@ import { makeNotificationsHandlers } from './notifications/handlers.js';
 import { makeAuthRoutes } from './auth/routes.js';
 import { SESSION_PREFIX } from './auth/sessions.js';
 import { createMagicLink, consumeMagicLink, MAGIC_LINK_TTL_MS } from './auth/magicLink.js';
+import {
+  startRegistration,
+  finishRegistration,
+  startAuthentication,
+  finishAuthentication,
+} from './auth/passkey.js';
+import { setSessionCookie, clearSessionCookie } from './server-shared.js';
 import { openDatabase, applyMigrations, defaultMigrationsDir, type Db } from './db/index.js';
 
 export interface ServerDeps {
@@ -317,6 +324,80 @@ export function buildApp(deps: ServerDeps): Express {
     }
   });
 
+  // PR 6 — Passkey (WebAuthn).
+  app.post(
+    '/auth/passkey/register/options',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = randomUUID();
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const token = extractSessionToken(req);
+        const { verifyIdentity } = await import('./auth/service.js');
+        const identity = await verifyIdentity(repo, token ? { sessionToken: token } : undefined);
+        const organizationId = String(body['organizationId'] ?? '');
+        if (!organizationId) throw ApiError.badRequest('VALIDATION_ERROR', 'Falta organizationId');
+        const options = await startRegistration(repo, { userId: identity.sub, organizationId });
+        res.json(ok(options, requestId));
+      } catch (error) {
+        next({ requestId, error });
+      }
+    },
+  );
+  app.post(
+    '/auth/passkey/register/verify',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = randomUUID();
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const token = extractSessionToken(req);
+        const { verifyIdentity } = await import('./auth/service.js');
+        const identity = await verifyIdentity(repo, token ? { sessionToken: token } : undefined);
+        const organizationId = String(body['organizationId'] ?? '');
+        const result = await finishRegistration(repo, {
+          userId: identity.sub,
+          organizationId,
+          response: body['response'] as never,
+        });
+        res.json(ok(result, requestId));
+      } catch (error) {
+        next({ requestId, error });
+      }
+    },
+  );
+  app.post(
+    '/auth/passkey/login/options',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = randomUUID();
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const organizationId = String(body['organizationId'] ?? '');
+        if (!organizationId) throw ApiError.badRequest('VALIDATION_ERROR', 'Falta organizationId');
+        const options = await startAuthentication(repo, organizationId);
+        res.json(ok(options, requestId));
+      } catch (error) {
+        next({ requestId, error });
+      }
+    },
+  );
+  app.post(
+    '/auth/passkey/login/verify',
+    async (req: Request, res: Response, next: NextFunction) => {
+      const requestId = randomUUID();
+      try {
+        const body = (req.body ?? {}) as Record<string, unknown>;
+        const organizationId = String(body['organizationId'] ?? '');
+        const result = await finishAuthentication(
+          repo,
+          { organizationId, response: body['response'] as never },
+          res,
+        );
+        res.json(ok(result, requestId));
+      } catch (error) {
+        next({ requestId, error });
+      }
+    },
+  );
+
   // Single action endpoint. Mirrors Apps Script doPost() contract.
   app.post('/api', async (req: Request, res: Response, next: NextFunction) => {
     const requestId = randomUUID();
@@ -396,23 +477,6 @@ export async function createServer(): Promise<{
 }
 
 // --- Helpers for session cookie handling ---------------------------------
-
-const SESSION_COOKIE = 'mayordomia_session';
-const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-
-function setSessionCookie(res: Response, token: string): void {
-  res.cookie(SESSION_COOKIE, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env['NODE_ENV'] === 'production',
-    maxAge: SESSION_MAX_AGE_MS,
-    path: '/',
-  });
-}
-
-function clearSessionCookie(res: Response): void {
-  res.clearCookie(SESSION_COOKIE, { path: '/' });
-}
 
 function extractSessionToken(req: Request): string | undefined {
   // 1. Authorization: Bearer sess_…

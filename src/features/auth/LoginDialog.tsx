@@ -18,6 +18,7 @@ import {
   Tabs,
   Tab,
 } from '@mui/material';
+import { startAuthentication as startPasskey } from '@simplewebauthn/browser';
 import { useAuth } from '../../integrations/auth';
 
 interface LoginDialogProps {
@@ -27,7 +28,7 @@ interface LoginDialogProps {
   defaultOrganizationId?: string;
 }
 
-type Mode = 'password' | 'magic-link';
+type Mode = 'password' | 'magic-link' | 'passkey';
 
 export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialogProps) {
   const { signIn, signUp, isLoading } = useAuth();
@@ -111,6 +112,7 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
       >
         <Tab value="password" label="Contraseña" />
         <Tab value="magic-link" label="Magic link" />
+        <Tab value="passkey" label="Passkey" />
       </Tabs>
       <form onSubmit={(e) => void handleSubmit(e)}>
         <DialogContent>
@@ -189,13 +191,15 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
         </DialogContent>
         <DialogActions sx={{ flexDirection: 'column', alignItems: 'stretch', p: 2, gap: 1 }}>
           <Button type="submit" variant="contained" disabled={loading}>
-            {authMode === 'magic-link' && magicSent
-              ? 'Verificar enlace'
-              : authMode === 'password'
-                ? passwordMode === 'login'
-                  ? 'Iniciar sesión'
-                  : 'Crear cuenta'
-                : 'Enviar enlace'}
+            {authMode === 'passkey'
+              ? 'Iniciar con passkey'
+              : authMode === 'magic-link' && magicSent
+                ? 'Verificar enlace'
+                : authMode === 'password'
+                  ? passwordMode === 'login'
+                    ? 'Iniciar sesión'
+                    : 'Crear cuenta'
+                  : 'Enviar enlace'}
           </Button>
           {authMode === 'password' && (
             <Button
