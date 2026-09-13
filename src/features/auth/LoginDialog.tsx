@@ -62,7 +62,7 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
         onClose();
       } else {
         if (magicToken) {
-          const res = await fetch('/auth/magic-link/verify', {
+          const res = await fetch('/api/auth/magic-link/verify', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -72,7 +72,7 @@ export function LoginDialog({ open, onClose, defaultOrganizationId }: LoginDialo
           if (!body.ok) throw new Error(body.error?.message ?? 'verify failed');
           window.location.reload();
         } else {
-          const res = await fetch('/auth/magic-link', {
+          const res = await fetch('/api/auth/magic-link', {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
