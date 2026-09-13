@@ -1,0 +1,61 @@
+# docker-compose.pi.yml — Mayordomía en la Raspberry Pi con SQLite local.
+#
+# Diferencias vs docker-compose.yml (que aún referencia Sheets/Google):
+#   - Drop SPREADSHEET_ID y GOOGLE_SERVICE_ACCOUNT_FILE
+#   - Add DB_PATH=/mayordomia/data/mayordomia.db (volumen persistente)
+#   - Usa imágenes locales diegominetti/mayordomia-{gateway,web}:32ec970
+#     cargadas con `docker load -i`, NO desde GHCR (pull_policy: never).
+#   - Network cloudflare-network sigue siendo external.
+#
+# Deploy en la Pi:
+#   1. `docker load -i /tmp/gateway-32ec970.tar`
+#   2. `docker load -i /tmp/web-32ec970.tar`
+#   3. `docker compose -f docker-compose.pi.yml up -d`
+#   4. `docker compose logs -f api` y verificar boot + 4 migrations
+
+services:
+  api:
+    image: diegominetti/mayordomia-gateway:32ec970
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LOG_LEVEL: info
+      DB_PATH: /mayordomia/data/mayordomia.db
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      PASSKEY_RP_ID: ${PASSKEY_RP_ID:-mayordomia.fewlines.com.ar}
+      PASSKEY_RP_NAME: ${PASSKEY_RP_NAME:-Mayordomía}
+      PASSKEY_ORIGIN: ${PASSKEY_ORIGIN:-https://mayordomia.fewlines.com.ar}
+      PUBLIC_TOKEN_PEPPER: ${PUBLIC_TOKEN_PEPPER:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-}
+    volumes:
+      - ./data:/mayordomia/data
+    networks:
+      cloudflare-network:
+        aliases:
+          - mayordomia-api
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/ping', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    image: diegominetti/mayordomia-web:32ec970
+    pull_policy: never
+    restart: unless-stopped
+    networks:
+      cloudflare-network:
+        aliases:
+          - mayordomia-web
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  cloudflare-network:
+    external: true
+    name: cloudflare-network
