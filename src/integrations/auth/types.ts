@@ -51,10 +51,17 @@ export interface AuthProvider {
    */
   subscribe(listener: AuthListener): () => void;
   /**
-   * Open the Google OAuth popup. Resolves once the user is authenticated.
-   * Rejects with an `AuthError` if the user denies or something fails.
+   * Authenticate. LocalAuthProvider accepts `{ email, password, organizationId }`;
+   * GoogleIdentityAuthProvider opens the GIS popup (no args). Rejects with an
+   * `AuthError` if the user denies or something fails.
    */
-  signIn(): Promise<void>;
+  signIn(credentials?: SignInCredentials): Promise<void>;
+  /**
+   * Register a new account. Only the LocalAuthProvider supports this; the
+   * Google provider throws because registration goes through the consent
+   * screen flow.
+   */
+  signUp?(credentials: SignUpCredentials): Promise<void>;
   /** Revoke the token and clear local state. Safe to call when already signed out. */
   signOut(): Promise<void>;
   /**
@@ -64,6 +71,16 @@ export interface AuthProvider {
   getValidAccessToken(): Promise<string>;
   /** Convenience for the UI: get the cached user when authenticated. */
   getUser(): GoogleUser | undefined;
+}
+
+export interface SignInCredentials {
+  email: string;
+  password: string;
+  organizationId: string;
+}
+
+export interface SignUpCredentials extends SignInCredentials {
+  name?: string;
 }
 
 /**

@@ -24,15 +24,17 @@ import {
 } from '../../domain/bootstrap';
 import { useOrgClient, useInvalidateOrgList } from '../../integrations/org';
 import { useAuth } from '../../integrations/auth';
+import { LoginDialog } from '../auth/LoginDialog';
 
 const steps = ['Bienvenida', 'Cuenta Google', 'Organización', 'Primera sede', 'Listo'];
 
 export function SetupPage() {
-  const { isAuthenticated, user, isLoading: authLoading, signIn, error: authError } = useAuth();
+  const { isAuthenticated, user, isLoading: authLoading, error: authError } = useAuth();
   const orgClient = useOrgClient();
   const invalidateOrgList = useInvalidateOrgList();
 
   const [step, setStep] = useState(0);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [descriptor, setDescriptor] = useState<OrganizationDescriptor | null>(null);
@@ -104,27 +106,26 @@ export function SetupPage() {
 
           {step === 1 && (
             <Stack gap={2}>
-              <Typography variant="h2">Cuenta Google</Typography>
+              <Typography variant="h2">Cuenta</Typography>
               {isAuthenticated && user ? (
                 <Alert severity="success">
                   Sesión iniciada como <strong>{user.email}</strong>.
                 </Alert>
               ) : (
                 <>
+                  <Typography>
+                    Vas a iniciar sesión con tu cuenta de Mayordomía (o crear una nueva si es la
+                    primera vez).
+                  </Typography>
                   <Button
                     variant="contained"
                     size="large"
-                    onClick={() => void signIn()}
-                    disabled={authLoading || authError?.code === 'NOT_CONFIGURED'}
+                    onClick={() => setLoginOpen(true)}
+                    disabled={authLoading}
                   >
-                    Continuar con Google
+                    Iniciar sesión / Crear cuenta
                   </Button>
-                  {authError?.code === 'NOT_CONFIGURED' && (
-                    <Alert severity="warning">
-                      Configurá <code>VITE_GOOGLE_CLIENT_ID</code> en tu <code>.env.local</code>{' '}
-                      para habilitar el login con Google.
-                    </Alert>
-                  )}
+                  {authError && <Alert severity="warning">{authError.message}</Alert>}
                 </>
               )}
             </Stack>
@@ -256,6 +257,7 @@ export function SetupPage() {
             )}
           </Box>
         </CardContent>
+        <LoginDialog open={loginOpen} onClose={() => setLoginOpen(false)} />
       </Card>
     </Container>
   );

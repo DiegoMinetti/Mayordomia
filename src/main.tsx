@@ -6,7 +6,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import { registerSW } from 'virtual:pwa-register';
 import { App } from './app/App';
 import { theme } from './app/theme';
-import { AuthContextProvider, GoogleIdentityAuthProvider } from './integrations/auth';
+import { AuthContextProvider, LocalAuthProvider } from './integrations/auth';
 import {
   createBootstrapClient,
   CurrentOrgProvider,
@@ -48,11 +48,13 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
 });
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL ?? '';
 const useMockPublic = import.meta.env.VITE_USE_MOCK_PUBLIC === 'true';
 
-const authProvider = new GoogleIdentityAuthProvider({ clientId: googleClientId });
+// PR 4: local email+password auth (replaces GoogleIdentityAuthProvider).
+// The provider reads its base URL from the gateway URL; in dev with a
+// Vite proxy that points at the local gateway, cookies work cross-origin.
+const authProvider = new LocalAuthProvider({ baseUrl: appsScriptUrl });
 const bootstrapClient = createBootstrapClient({
   appsScriptUrl,
   getAccessToken: () => authProvider.getValidAccessToken(),

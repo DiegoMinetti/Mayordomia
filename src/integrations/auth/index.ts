@@ -1,6 +1,6 @@
 export { AuthContext, AuthContextProvider } from './AuthContext';
-export { GoogleIdentityAuthProvider } from './GoogleIdentityAuthProvider';
-export type { GoogleIdentityAuthProviderOptions } from './GoogleIdentityAuthProvider';
+export { LocalAuthProvider } from './LocalAuthProvider';
+export type { LocalAuthProviderOptions } from './LocalAuthProvider';
 export { MockAuthProvider } from './MockAuthProvider';
 export type { MockAuthProviderOptions } from './MockAuthProvider';
 export { useAuth, useAuthContextValue } from './useAuth';
@@ -15,3 +15,9 @@ export type {
   GoogleUser,
   Scope,
 } from './types';
+
+// PR 4 deprecation note: GoogleIdentityAuthProvider is retained only for
+// reference and for the unit tests in this same folder. The main app wires
+// LocalAuthProvider in src/main.tsx.
+export { GoogleIdentityAuthProvider } from './GoogleIdentityAuthProvider';
+export type { GoogleIdentityAuthProviderOptions } from './GoogleIdentityAuthProvider';

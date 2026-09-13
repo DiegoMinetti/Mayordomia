@@ -39,6 +39,7 @@ import {
 } from '@mui/material';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../integrations/auth';
+import { LoginDialog } from '../features/auth/LoginDialog';
 import { useCurrentOrg } from '../integrations/org';
 import { NotificationBell } from '../features/notifications/NotificationBell';
 
@@ -57,9 +58,10 @@ export function AppShell() {
   const theme = useTheme();
   const desktop = useMediaQuery(theme.breakpoints.up('md'));
   const [open, setOpen] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const loc = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, user, signIn, signOut, error } = useAuth();
+  const { isAuthenticated, isLoading, user, signOut, error } = useAuth();
   const { organizationId, setOrganizationId, available: availableOrgs } = useCurrentOrg();
   const drawer = (
     <Box>
@@ -152,9 +154,7 @@ export function AppShell() {
           ) : (
             <Tooltip
               title={
-                error?.code === 'NOT_CONFIGURED'
-                  ? 'Configurá VITE_GOOGLE_CLIENT_ID para habilitar el login'
-                  : 'Iniciar sesión con Google'
+                error?.code === 'NOT_CONFIGURED' ? 'Auth provider no disponible' : 'Iniciar sesión'
               }
             >
               <span>
@@ -162,8 +162,8 @@ export function AppShell() {
                   variant="outlined"
                   size="small"
                   startIcon={<LoginIcon />}
-                  onClick={() => void signIn()}
-                  disabled={isLoading || error?.code === 'NOT_CONFIGURED'}
+                  onClick={() => setLoginDialogOpen(true)}
+                  disabled={isLoading}
                   sx={{ mr: 1 }}
                 >
                   Iniciar sesión
@@ -224,6 +224,7 @@ export function AppShell() {
           <BottomNavigationAction label="Más" icon={<MoreHoriz />} />
         </BottomNavigation>
       )}
+      <LoginDialog open={loginDialogOpen} onClose={() => setLoginDialogOpen(false)} />
     </Box>
   );
 }

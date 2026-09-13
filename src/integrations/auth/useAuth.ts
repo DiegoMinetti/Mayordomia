@@ -1,6 +1,6 @@
 import { useCallback, useContext, useSyncExternalStore } from 'react';
 import { AuthContext } from './AuthContext';
-import type { AuthProvider, GoogleUser } from './types';
+import type { AuthProvider, GoogleUser, SignInCredentials, SignUpCredentials } from './types';
 
 export function useAuthContextValue(): AuthProvider {
   const ctx = useContext(AuthContext);
@@ -16,7 +16,8 @@ export interface UseAuthResult {
   isLoading: boolean;
   user: GoogleUser | undefined;
   error: { code: string; message: string } | undefined;
-  signIn: () => Promise<void>;
+  signIn: (credentials: SignInCredentials) => Promise<void>;
+  signUp?: (credentials: SignUpCredentials) => Promise<void>;
   signOut: () => Promise<void>;
   /** Returns a valid access token, refreshing silently if needed. */
   getValidAccessToken: () => Promise<string>;
@@ -30,7 +31,17 @@ export function useAuth(): UseAuthResult {
     () => provider.state,
   );
 
-  const signIn = useCallback(() => provider.signIn(), [provider]);
+  const signIn = useCallback(
+    (credentials: SignInCredentials) => provider.signIn(credentials),
+    [provider],
+  );
+  const signUp = useCallback(
+    (credentials: SignUpCredentials) => {
+      if (!provider.signUp) throw new Error('signUp no soportado por este provider');
+      return provider.signUp(credentials);
+    },
+    [provider],
+  );
   const signOut = useCallback(() => provider.signOut(), [provider]);
   const getValidAccessToken = useCallback(() => provider.getValidAccessToken(), [provider]);
 
@@ -41,6 +52,7 @@ export function useAuth(): UseAuthResult {
     user: state.status === 'authenticated' ? state.session.user : undefined,
     error: state.status === 'unauthenticated' ? state.error : undefined,
     signIn,
+    signUp: provider.signUp ? signUp : undefined,
     signOut,
     getValidAccessToken,
   };
