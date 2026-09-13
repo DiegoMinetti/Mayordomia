@@ -83,7 +83,7 @@ describe('db boot integration', () => {
 
     expect(result.sqlite).toMatchObject({
       status: 'OK',
-      tables: 24,
+      tables: 25,
       migrationsApplied: applied.length,
     });
     expect(applied.length).toBeGreaterThan(0);

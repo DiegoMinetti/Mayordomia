@@ -10,6 +10,20 @@ vi.mock('googleapis', () => {
 
 import { register, dispatch, _reset } from '../src/router/index.js';
 import type { Repository } from '../src/repository/index.js';
+import { createHash } from 'node:crypto';
+
+const SESSION_TOKEN = 'sess_' + 'a'.repeat(43);
+const SESSION_ID = createHash('sha256').update(SESSION_TOKEN).digest('hex');
+const AUTH_SESSION = {
+  id: SESSION_ID,
+  userId: 'usr_aaa',
+  organizationId: 'org_123456',
+  expiresAt: new Date(Date.now() + 60000).toISOString(),
+  createdAt: new Date().toISOString(),
+  revokedAt: '',
+  userAgent: '',
+  ip: '',
+};
 import { makeAuditService } from '../src/audit/service.js';
 
 const AUTH_USER = {
@@ -34,13 +48,14 @@ function fakeRepo(
   findOneByTable: Record<string, Record<string, unknown> | null> = {},
 ): Repository {
   const allRows: Record<string, Array<Record<string, unknown>>> = {
-    Users: [AUTH_USER],
-    UserRoles: [AUTH_ROLE_ASSIGNMENT],
-    RolePermissions: AUTH_PERMISSIONS,
+    users: [AUTH_USER],
+    user_roles: [AUTH_ROLE_ASSIGNMENT],
+    role_permissions: AUTH_PERMISSIONS,
     ...rowsByTable,
   };
   const allFindOne: Record<string, Record<string, unknown> | null> = {
-    Users: AUTH_USER,
+    users: AUTH_USER,
+    sessions: AUTH_SESSION,
     ...findOneByTable,
   };
   return {
@@ -122,7 +137,11 @@ describe('resources handlers', () => {
       handlers.list(p, ctx),
     );
     const result = await dispatch(
-      { action: 'resources.list', organizationId: 'org_123456', auth: { accessToken: 'tok' } },
+      {
+        action: 'resources.list',
+        organizationId: 'org_123456',
+        auth: { sessionToken: SESSION_TOKEN },
+      },
       { repo, audit },
     );
     const ids = (result as { resources: Array<{ id: string }> }).resources.map((r) => r.id);
@@ -150,7 +169,7 @@ describe('resources handlers', () => {
       {
         action: 'resources.get',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { id: 'res_aaa' },
       },
       { repo, audit },
@@ -161,7 +180,7 @@ describe('resources handlers', () => {
         {
           action: 'resources.get',
           organizationId: 'org_123456',
-          auth: { accessToken: 'tok' },
+          auth: { sessionToken: SESSION_TOKEN },
           payload: { id: 'res_missing' },
         },
         { repo, audit },
@@ -202,7 +221,7 @@ describe('resources handlers', () => {
       {
         action: 'resources.listLocations',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
       },
       { repo, audit },
     );
@@ -250,7 +269,7 @@ describe('events handlers', () => {
       {
         action: 'events.list',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { startAfter: '2030-01-01T00:00:00.000Z' },
       },
       { repo, audit },
@@ -298,7 +317,7 @@ describe('events handlers', () => {
       {
         action: 'events.upcoming',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { days: 14 },
       },
       { repo, audit },
@@ -320,7 +339,7 @@ describe('events handlers', () => {
         {
           action: 'events.upcoming',
           organizationId: 'org_123456',
-          auth: { accessToken: 'tok' },
+          auth: { sessionToken: SESSION_TOKEN },
           payload: { days: 999 },
         },
         { repo, audit },

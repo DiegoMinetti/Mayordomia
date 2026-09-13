@@ -19,6 +19,8 @@ import { makeOperationsHandlers } from './operations/handlers.js';
 import { makeMaintenanceHandlers } from './maintenance/handlers.js';
 import { makePurchasesHandlers } from './purchases/handlers.js';
 import { makeNotificationsHandlers } from './notifications/handlers.js';
+import { makeAuthRoutes } from './auth/routes.js';
+import { SESSION_PREFIX } from './auth/sessions.js';
 import { openDatabase, applyMigrations, defaultMigrationsDir, type Db } from './db/index.js';
 
 export interface ServerDeps {
@@ -183,13 +185,80 @@ export function buildApp(deps: ServerDeps): Express {
     logger.warn('PUBLIC_TOKEN_PEPPER not set — requests.createPublic route disabled');
   }
 
+  // PR 3 — Local auth endpoints. These bypass the dispatcher because they
+  // don't have an organizationId yet (register/login bootstrap the tenant).
+  const auth = makeAuthRoutes({ repo });
+  app.post('/auth/register', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await auth.register({
+        ...body,
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
+      setSessionCookie(res, result['token'] as string);
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+  app.post('/auth/login', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const result = await auth.login({
+        ...body,
+        userAgent: req.headers['user-agent'],
+        ip: req.ip,
+      });
+      setSessionCookie(res, result['token'] as string);
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+  app.post('/auth/logout', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const result = await auth.logout(extractSessionToken(req));
+      clearSessionCookie(res);
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+  app.post('/auth/refresh', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const result = await auth.refresh(extractSessionToken(req));
+      setSessionCookie(res, result['token'] as string);
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+  app.post('/auth/me', async (req: Request, res: Response, next: NextFunction) => {
+    const requestId = randomUUID();
+    try {
+      const result = await auth.me(extractSessionToken(req));
+      res.json(ok(result, requestId));
+    } catch (error) {
+      next({ requestId, error });
+    }
+  });
+
   // Single action endpoint. Mirrors Apps Script doPost() contract.
   app.post('/api', async (req: Request, res: Response, next: NextFunction) => {
     const requestId = randomUUID();
     req.log = req.log ?? logger;
     try {
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const sessionToken = extractSessionToken(req);
       const result = await dispatch(
-        { ...(req.body as object), requestId } as Parameters<typeof dispatch>[0] & {
+        { ...body, requestId, auth: sessionToken ? { sessionToken } : undefined } as Parameters<
+          typeof dispatch
+        >[0] & {
           requestId: string;
         },
         dispatchDeps,
@@ -250,9 +319,45 @@ export async function createServer(): Promise<{
   } else {
     logger.info({ total: migrationResult.total }, 'sqlite migrations up to date');
   }
-  // PR 2: SQLite is the only store. Sheets/Google config is no longer required.
+  // PR 3: SQLite is the only store. No Google deps.
   const repo = makeRepository(db);
   const audit = makeAuditService(repo, logger);
   const app = buildApp({ config, logger, repo, audit, db });
   return { app, config, logger, repo, db };
+}
+
+// --- Helpers for session cookie handling ---------------------------------
+
+const SESSION_COOKIE = 'mayordomia_session';
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function setSessionCookie(res: Response, token: string): void {
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env['NODE_ENV'] === 'production',
+    maxAge: SESSION_MAX_AGE_MS,
+    path: '/',
+  });
+}
+
+function clearSessionCookie(res: Response): void {
+  res.clearCookie(SESSION_COOKIE, { path: '/' });
+}
+
+function extractSessionToken(req: Request): string | undefined {
+  // 1. Authorization: Bearer sess_…
+  const auth = req.headers['authorization'];
+  if (auth && auth.startsWith('Bearer ') && auth.slice(7).startsWith(SESSION_PREFIX)) {
+    return auth.slice(7);
+  }
+  // 2. Cookie
+  const cookieHeader = req.headers['cookie'];
+  if (cookieHeader) {
+    const match = /(?:^|;\s*)mayordomia_session=([^;]+)/.exec(cookieHeader);
+    if (match && match[1] && match[1].startsWith(SESSION_PREFIX)) {
+      return decodeURIComponent(match[1]);
+    }
+  }
+  return undefined;
 }

@@ -106,16 +106,19 @@ function quoteIdent(name: string): string {
 }
 
 /**
- * Coerce values to the right SQLite representation for known columns.
- * Booleans become 0/1 integers (matching the CHECK constraints in the schema);
- * everything else is passed through as-is and bound by better-sqlite3.
+ * Coerce values to the right SQLite representation for binding.
+ *
+ * Rules:
+ *   - `undefined` → `null` (so we don't leave required columns unset).
+ *   - Everything else passes through verbatim: SQLite stores booleans as
+ *     0/1 (matching the CHECK constraints), strings as TEXT, numbers as REAL/INTEGER.
+ *   - We deliberately do NOT turn empty strings into null. Empty strings are
+ *     valid for NOT NULL TEXT columns with `DEFAULT ''`, and the Sheets-backed
+ *     code wrote empty strings for "no value yet". Preserving them keeps the
+ *     round-trip identical to the old Sheets client.
  */
-function normalizeForColumn(column: string, value: unknown): unknown {
-  // Heuristic: any column named `*_at` or `*_by` is a TEXT; everything else
-  // is bound as-is. Booleans are handled by better-sqlite3 (true/false → 1/0).
-  // The schema's `CHECK (col IN (0,1))` constraints make this safe.
+function normalizeForColumn(_column: string, value: unknown): unknown {
   if (value === undefined) return null;
-  if (value === '') return null;
   return value;
 }
 

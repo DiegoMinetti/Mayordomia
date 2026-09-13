@@ -1,16 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.mock('googleapis', () => {
-  const tokeninfo = vi.fn().mockResolvedValue({
-    data: { email: 'a@b.com', email_verified: 'true' },
-  });
-  const userinfoGet = vi.fn().mockResolvedValue({
-    data: { email: 'a@b.com', name: 'Alice', picture: '', sub: 'sub-1' },
-  });
-  const oauth2 = vi.fn(() => ({ tokeninfo, userinfo: { get: userinfoGet } }));
-  return { google: { oauth2 } };
-});
-
 import { register, dispatch, _reset, _routeCount } from '../src/router/index.js';
 import type { Repository } from '../src/repository/index.js';
 import { makeAuditService } from '../src/audit/service.js';
@@ -90,22 +79,47 @@ describe('router', () => {
   });
 
   it('audits when option is set and auth resolved', async () => {
+    const sessionUser = {
+      id: 'u-1',
+      organizationId: 'org_123456',
+      email: 'a@b.com',
+      status: 'ACTIVE',
+    };
+    // PR 3: seed a sessions row so the router's context() lookup resolves.
+    const sessions: Array<Record<string, unknown>> = [
+      {
+        id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        userId: 'u-1',
+        organizationId: 'org_123456',
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        createdAt: new Date().toISOString(),
+        revokedAt: '',
+        userAgent: '',
+        ip: '',
+      },
+    ];
     const repo = fakeRepo({
-      findOne: vi
-        .fn()
-        .mockResolvedValue({
-          id: 'u-1',
-          organizationId: 'org_123456',
-          email: 'a@b.com',
-          status: 'ACTIVE',
-        }),
-      rows: vi.fn().mockResolvedValue([]),
+      findOne: vi.fn(async (table: string) => {
+        if (table === 'sessions') return sessions[0] ?? null;
+        if (table === 'users') return sessionUser;
+        return null;
+      }),
+      rows: vi.fn(async (table: string) => {
+        if (table === 'sessions') return sessions;
+        if (table === 'user_roles') return [];
+        if (table === 'role_permissions') return [];
+        return [];
+      }),
     });
     const audit = makeAuditService(repo, silentLogger);
     const appendSpy = vi.spyOn(audit, 'record');
     register('audited.action', { auth: true, audit: true }, () => ({ ok: true }));
     await dispatch(
-      { action: 'audited.action', organizationId: 'org_123456', auth: { accessToken: 'tok' } },
+      {
+        action: 'audited.action',
+        organizationId: 'org_123456',
+        auth: { sessionToken: 'sess_' + 'a'.repeat(43) },
+      },
       { repo, audit },
     );
     expect(appendSpy).toHaveBeenCalledWith(expect.objectContaining({ action: 'audited.action' }));

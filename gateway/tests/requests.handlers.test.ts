@@ -13,6 +13,20 @@ vi.mock('googleapis', () => {
 
 import { register, dispatch, _reset } from '../src/router/index.js';
 import type { Repository } from '../src/repository/index.js';
+import { createHash } from 'node:crypto';
+
+const SESSION_TOKEN = 'sess_' + 'a'.repeat(43);
+const SESSION_ID = createHash('sha256').update(SESSION_TOKEN).digest('hex');
+const AUTH_SESSION = {
+  id: SESSION_ID,
+  userId: 'usr_aaa',
+  organizationId: 'org_123456',
+  expiresAt: new Date(Date.now() + 60000).toISOString(),
+  createdAt: new Date().toISOString(),
+  revokedAt: '',
+  userAgent: '',
+  ip: '',
+};
 import { makeAuditService } from '../src/audit/service.js';
 import { ApiException } from '../src/errors.js';
 
@@ -51,12 +65,13 @@ const AUTH_PERMISSIONS = [
   },
 ];
 const AUTH_DEFAULTS_ROWS: Record<string, Array<Record<string, unknown>>> = {
-  Users: [AUTH_USER],
-  UserRoles: [AUTH_ROLE_ASSIGNMENT],
-  RolePermissions: AUTH_PERMISSIONS,
+  users: [AUTH_USER],
+  user_roles: [AUTH_ROLE_ASSIGNMENT],
+  role_permissions: AUTH_PERMISSIONS,
 };
 const AUTH_DEFAULTS_FIND_ONE: Record<string, Record<string, unknown> | null> = {
-  Users: AUTH_USER,
+  users: AUTH_USER,
+  sessions: AUTH_SESSION,
 };
 
 function fakeRepo(options: FakeSheetsOptions = {}): Repository {
@@ -147,7 +162,11 @@ describe('requests handlers', () => {
       handlers.list(p, ctx),
     );
     const result = await dispatch(
-      { action: 'requests.list', organizationId: 'org_123456', auth: { accessToken: 'tok' } },
+      {
+        action: 'requests.list',
+        organizationId: 'org_123456',
+        auth: { sessionToken: SESSION_TOKEN },
+      },
       { repo, audit },
     );
     expect((result as { requests: Array<{ id: string }> }).requests.map((r) => r.id)).toEqual([
@@ -194,7 +213,7 @@ describe('requests handlers', () => {
         {
           action: 'requests.approve',
           organizationId: 'org_123456',
-          auth: { accessToken: 'tok' },
+          auth: { sessionToken: SESSION_TOKEN },
           payload: { id: 'req_aaa', scope: 'AREA', expectedVersion: 1, comment: 'ok' },
         },
         { repo, audit },
@@ -206,7 +225,7 @@ describe('requests handlers', () => {
       {
         action: 'requests.approve',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { id: 'req_aaa', scope: 'AREA', expectedVersion: 3, comment: 'ok' },
       },
       { repo, audit },
@@ -253,7 +272,7 @@ describe('requests handlers', () => {
       {
         action: 'requests.get',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { id: 'req_aaa' },
       },
       { repo, audit },
@@ -298,7 +317,7 @@ describe('requests handlers', () => {
       {
         action: 'requests.reject',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { id: 'req_aaa', scope: 'AREA', expectedVersion: 5, comment: 'no' },
       },
       { repo, audit },
@@ -332,7 +351,7 @@ describe('requests handlers', () => {
         {
           action: 'requests.approve',
           organizationId: 'org_123456',
-          auth: { accessToken: 'tok' },
+          auth: { sessionToken: SESSION_TOKEN },
           payload: { id: 'req_aaa', scope: 'AREA', expectedVersion: 1, comment: '' },
         },
         { repo, audit },
@@ -351,7 +370,7 @@ describe('requests handlers', () => {
         {
           action: 'requests.approve',
           organizationId: 'org_123456',
-          auth: { accessToken: 'tok' },
+          auth: { sessionToken: SESSION_TOKEN },
           payload: { id: 'req_aaa', scope: 'NOPE', expectedVersion: 1, comment: '' },
         },
         { repo, audit },

@@ -8,6 +8,10 @@
  *
  *   register('catalog.listUsers', { auth: true }, (payload, ctx) => Catalog.listUsers(payload, ctx))
  *   dispatch({ action, organizationId, auth, payload }, deps)
+ *
+ * PR 3: `auth.sessionToken` replaces the old `auth.accessToken` (Google OAuth).
+ * The HTTP layer extracts the token from `Authorization: Bearer sess_…` or
+ * the `mayordomia_session` cookie before building IncomingRequest.
  */
 import { ApiError } from '../errors.js';
 import { object, string } from '../validation.js';
@@ -23,7 +27,7 @@ export type Handler<Output = unknown> = (
 
 export interface RouteOptions {
   auth?: boolean;
-  /** Verify Google token but skip org membership check (bootstrap flow). */
+  /** Verify session but skip org membership check (bootstrap flow). */
   identity?: boolean;
   permission?: string;
   audit?: boolean;
@@ -59,7 +63,7 @@ export function _reset(): void {
 export interface IncomingRequest {
   action: string;
   organizationId?: string;
-  auth?: { accessToken?: string };
+  auth?: { sessionToken?: string };
   payload?: Record<string, unknown>;
 }
 
@@ -81,7 +85,7 @@ export async function dispatch(req: IncomingRequest, deps: DispatchDeps): Promis
     ctx.auth = await AuthService.context(deps.repo, orgId, req.auth ?? {});
     if (route.options.permission) AuthService.requirePermission(ctx.auth, route.options.permission);
   } else if (route.options.identity) {
-    ctx.identity = await AuthService.verifyIdentity(req.auth ?? {});
+    ctx.identity = await AuthService.verifyIdentity(deps.repo, req.auth ?? {});
   }
 
   const result = await route.handler(req.payload ?? {}, ctx);

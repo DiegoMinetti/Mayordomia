@@ -1,16 +1,23 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-vi.mock('googleapis', () => {
-  const tokeninfo = vi.fn().mockResolvedValue({
-    data: { email: 'a@b.com', email_verified: 'true' },
-  });
-  const oauth2 = vi.fn(() => ({ tokeninfo }));
-  return { google: { oauth2 } };
-});
-
 import { register, dispatch, _reset } from '../src/router/index.js';
 import type { Repository } from '../src/repository/index.js';
 import { makeAuditService } from '../src/audit/service.js';
+import { createHash } from 'node:crypto';
+
+// PR 3: build a sessions row + matching token for the router to resolve.
+const SESSION_TOKEN = 'sess_' + 'a'.repeat(43);
+const SESSION_ID = createHash('sha256').update(SESSION_TOKEN).digest('hex');
+const AUTH_SESSION = {
+  id: SESSION_ID,
+  userId: 'usr_aaa',
+  organizationId: 'org_123456',
+  expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  createdAt: new Date().toISOString(),
+  revokedAt: '',
+  userAgent: '',
+  ip: '',
+};
 
 const AUTH_USER = {
   id: 'usr_aaa',
@@ -34,15 +41,17 @@ function fakeRepo(
   findOneByTable: Record<string, Record<string, unknown> | null> = {},
 ): Repository {
   const allRows: Record<string, Array<Record<string, unknown>>> = {
-    Users: [AUTH_USER],
-    UserRoles: [
+    users: [AUTH_USER],
+    user_roles: [
       { id: 'ur_aaa', organizationId: 'org_123456', userId: 'usr_aaa', roleId: 'role_aaa' },
     ],
-    RolePermissions: AUTH_PERMISSIONS,
+    role_permissions: AUTH_PERMISSIONS,
+    sessions: [AUTH_SESSION],
     ...rowsByTable,
   };
   const allFindOne: Record<string, Record<string, unknown> | null> = {
     Users: AUTH_USER,
+    sessions: AUTH_SESSION,
     ...findOneByTable,
   };
   return {
@@ -122,7 +131,11 @@ describe('operations', () => {
       handlers.list(p, ctx),
     );
     const result = await dispatch(
-      { action: 'operations.list', organizationId: 'org_123456', auth: { accessToken: 'tok' } },
+      {
+        action: 'operations.list',
+        organizationId: 'org_123456',
+        auth: { sessionToken: SESSION_TOKEN },
+      },
       { repo, audit },
     );
     expect((result as { deliveries: Array<{ id: string }> }).deliveries.map((d) => d.id)).toEqual([
@@ -180,7 +193,7 @@ describe('operations', () => {
       {
         action: 'operations.get',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { id: 'dlv_aaa' },
       },
       { repo, audit },
@@ -247,7 +260,7 @@ describe('maintenance', () => {
       {
         action: 'maintenance.list',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { severity: 'HIGH' },
       },
       { repo, audit },
@@ -341,7 +354,7 @@ describe('purchases', () => {
       {
         action: 'purchases.listRequests',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
       },
       { repo, audit },
     );
@@ -378,7 +391,7 @@ describe('purchases', () => {
       {
         action: 'purchases.listSuppliers',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
         payload: { active: true },
       },
       { repo, audit },
@@ -435,7 +448,7 @@ describe('notifications', () => {
       {
         action: 'notifications.listMine',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
       },
       { repo, audit },
     );
@@ -490,7 +503,7 @@ describe('notifications', () => {
       {
         action: 'notifications.unreadCount',
         organizationId: 'org_123456',
-        auth: { accessToken: 'tok' },
+        auth: { sessionToken: SESSION_TOKEN },
       },
       { repo, audit },
     );
